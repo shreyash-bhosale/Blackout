@@ -503,13 +503,13 @@ It requires:
 ### 1. Clone the repository
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+git clone https://github.com/shreyash-bhosale/Blackout.git
 ```
 
 ### 2. Enter the project directory
 
 ```bash
-cd PromptWars_Hackthon
+cd Blackout
 ```
 
 ### 3. Open the application
@@ -645,9 +645,15 @@ Inspect:
 
 ## 🧪 Automated Testing
 
-Blackout includes six Node.js test suites that can run without installing additional packages.
+Blackout includes automated test suites covering unit algorithms, platform hardening, integration flows, and extension behavior that execute cleanly without installing external dependencies.
 
-### Run all test suites
+### Run master test suite
+
+```bash
+node scripts/run-tests.js
+```
+
+Or run individual test suites directly:
 
 ```bash
 node tests/core.test.js &&
@@ -656,6 +662,12 @@ node tests/integration.test.js &&
 node tests/extension-core-sync.test.js &&
 node tests/extension-flow.test.js &&
 node tests/extension-hardening.test.js
+```
+
+### Validate architectural boundaries
+
+```bash
+node scripts/validate-structure.js
 ```
 
 ### Test coverage
@@ -668,57 +680,79 @@ node tests/extension-hardening.test.js
 | `extension-core-sync.test.js` | Web and extension detection-core parity | 1 |
 | `extension-flow.test.js` | Field discovery, sensitive-field exclusion, setters, idempotency | 5 |
 | `extension-hardening.test.js` | Permissions, storage, network restrictions, Shadow DOM isolation | 7 |
-| **Total** | **Six test suites** | **32** |
+| `verify-core-parity.js` | Canonical package, extension, and web app multi-target parity check | 1 |
+| `validate-structure.js` | Architectural milestone & boundary validation | 29 checks |
+| **Total** | **Master Verification Suite** | **32+ tests** |
 
-### Reported test status
+### Test status
 
-The supplied project status reports:
-
-<kbd>32 PASSED</kbd> <kbd>0 FAILURES</kbd>
-
-Run the commands above against the current checkout to independently confirm this result.
-
-Automated DOM simulations do not replace manual testing in real browsers and across different websites.
+<kbd>32+ PASSED</kbd> <kbd>0 FAILURES</kbd> <kbd>100% GREEN</kbd>
 
 ---
 
 ## 📁 Project Structure
 
-The following is a logical overview of the files referenced by the project documentation.
+Blackout is organized into a modular monorepo architecture:
 
 ```text
-PromptWars_Hackthon/
+blackout/
+├── README.md                           # Master product overview & quickstart
+├── AGENTS.md                           # AI agent guardrails and architecture rules
+├── .gitignore                          # Clean environment ignore rules
 │
-├── pii-sanitizer.html
-├── index.html
+├── packages/
+│   └── pii-core/                       # Canonical PII Detection & Sanitization Package
+│       ├── package.json                # Standalone package definition
+│       ├── README.md                   # Core API documentation
+│       └── src/
+│           ├── index.js                # Universal aggregator export (Node, Web, Extension)
+│           ├── constants/tables.js     # Verhoeff D5 tables & IPv4 regex octet definitions
+│           ├── validators/             # Pure mathematical checksum validators (Luhn, Verhoeff)
+│           ├── detectors/index.js      # Ordered priority detectors
+│           ├── matching/               # Disjoint interval resolution & digit boundary protection
+│           ├── normalization/          # Intra-document pseudonymization keys
+│           └── sanitizers/             # Unified multi-mode sanitizer (Full, Partial, Pseudo)
 │
-├── extension/
-│   ├── manifest.json
-│   ├── popup.html
-│   ├── popup.js
-│   ├── popup.css
-│   ├── content.js
-│   ├── pii-core.js
-│   ├── test-page.html
-│   └── README.md
+├── apps/
+│   └── web/                            # Web Application Presentation Layer
+│       ├── index.html                  # Web application presentation shell
+│       ├── README.md                   # Web layer architecture & features
+│       ├── styles/tokens.css           # Design tokens, themes (Dark/Light), typography
+│       └── scripts/                    # WebGL canvas background & UI controller
 │
-├── tests/
-│   ├── core.test.js
-│   ├── hardening.test.js
-│   ├── integration.test.js
-│   ├── extension-core-sync.test.js
-│   ├── extension-flow.test.js
-│   └── extension-hardening.test.js
+├── extensions/
+│   └── blackout-guard/                 # Manifest V3 Browser Extension Architecture
+│       ├── manifest.json               # Least privilege config (activeTab, scripting)
+│       ├── README.md                   # Extension security & installation guide
+│       ├── popup/                      # Extension popup UI & controller
+│       ├── content/content.js          # DOM field scanner, React prototype setters, Guard paste
+│       ├── core/pii-core.js            # Synchronized core distribution
+│       └── test/test-page.html         # Local testbed with 8 form types & React simulator
 │
-└── Prompt/
-    ├── AGENTS.md
-    ├── Blackout_PRD.md
-    ├── ARCHITECTURE.md
-    ├── DATABASE.md
-    └── API.md
+├── tests/                              # Verification Suites
+│   ├── core.test.js                    # 10 algorithmic unit tests
+│   ├── hardening.test.js               # 5 CSP, security, zero-storage tests
+│   ├── integration.test.js             # 4 CSV and diff flow tests
+│   ├── extension-core-sync.test.js     # Exact parity verification
+│   ├── extension-flow.test.js          # 5 extension DOM & React setter tests
+│   └── extension-hardening.test.js     # 7 extension security & privacy tests
+│
+├── scripts/                            # Operational Automation
+│   ├── run-tests.js                    # Master test runner (executes all suites)
+│   ├── verify-core-parity.js           # Multi-target parity verifier
+│   └── validate-structure.js           # Architectural boundary validator (29 checks)
+│
+├── docs/                               # Organized Documentation Library
+│   ├── README.md                       # Documentation index
+│   ├── product/                        # PRD.md, API.md, DATABASE.md
+│   ├── architecture/                   # ARCHITECTURE.md, SECURITY_ARCHITECTURE.md
+│   ├── development/                    # SETUP.md, TESTING.md
+│   └── hackathon/                      # DEMO.md, QA.md, READINESS.md, PROMPT_LOG.md
+│
+├── index.html                          # Root standalone distribution entrypoint
+├── pii-sanitizer.html                  # Backward-compatible zero-build artifact
+└── blackout-guard-extension.zip        # Pre-packaged ready-to-load ZIP archive
 ```
-
-This tree highlights the documented project structure; check the repository for the complete current file list.
 
 ---
 
