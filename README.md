@@ -1,546 +1,563 @@
-<div align="center">
+<div align="center">BLACKOUT
+Detect. Classify. Redact. Keep processing local.
+A privacy-first, browser-based PII detection and text sanitization platform.
 
-# BLACKOUT
+Blackout helps people inspect text and documents for sensitive identifiers, then redact, mask, or pseudonymize them locally in the browser — without sending the content to a processing server.
+<p>
+  <a href="https://github.com/shreyash-bhosale/Blackout">
+    <img src="https://img.shields.io/badge/Source%20Code-GitHub-181717?style=for-the-badge&logo=github" alt="GitHub source code">
+  </a>
+  <a href="docs/architecture/ARCHITECTURE.md">
+    <img src="https://img.shields.io/badge/Architecture-Documentation-64748B?style=for-the-badge" alt="Architecture documentation">
+  </a>
+  <a href="docs/architecture/SECURITY_ARCHITECTURE.md">
+    <img src="https://img.shields.io/badge/Security-Design-0F766E?style=for-the-badge" alt="Security architecture">
+  </a>
+  <a href="tests/">
+    <img src="https://img.shields.io/badge/Automated%20Tests-32%20Reported%20Passing-16A34A?style=for-the-badge" alt="32 reported passing tests">
+  </a>
+</p><p>
+  <img src="https://img.shields.io/badge/JavaScript-ES6%2B-F7DF1E?style=flat-square&logo=javascript&logoColor=111111" alt="JavaScript ES6+">
+  <img src="https://img.shields.io/badge/Browser-Chromium-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Chromium">
+  <img src="https://img.shields.io/badge/Extension-Manifest%20V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Manifest V3">
+  <img src="https://img.shields.io/badge/Dependencies-Core%20Zero--Dependency-16A34A?style=flat-square" alt="Zero dependency core">
+</p>
+Your sensitive data should not need to leave your browser to become safer to share.
 
-### Detect. Classify. Redact. Keep processing local.
+Repository ·
+[Architecture](docs/architecture/ARCHITECTURE.md) ·
+[Security Design](docs/architecture/SECURITY_ARCHITECTURE.md) ·
+[Demo Guide](docs/hackathon/DEMO.md) ·
+[Technical Q&A](docs/hackathon/QA.md)
+</div>Table of Contents
+- Overview
+- The Problem
+- How Blackout Works
+- Product Ecosystem
+- Features
+  - PII Detection Engine
+  - Sanitization Modes
+  - Reactive Workspace
+  - Audit Inspector
+  - Local File Processing
+  - Blackout Guard Extension
+- Architecture
+- Data Flow
+- Privacy and Security
+- Threat Model and Limitations
+- Technology Stack
+- Repository Structure
+- Getting Started
+- Browser Extension Setup
+- Testing and Verification
+- Privacy Verification
+- Known Limitations
+- Roadmap
+- Hackathon Evaluation
+- Contributing
+- License and Author
+🔍 Overview
+Blackout is an open-source, client-side privacy tool that detects supported personally identifiable information (PII) in text and documents. Users can inspect findings and generate sanitized output before sharing content in public issue trackers, support workflows, engineering logs, datasets, or AI prompts.
 
-A privacy-first, browser-only personally identifiable information (PII) detection and text sanitization platform.
+Unlike a cloud redaction service, Blackout is designed to perform detection and sanitization in the browser. Its core engine uses deterministic pattern matching and identifier-specific validation algorithms. The web application and companion Chromium extension share the same detection and sanitization logic.
+At a glance
+Capability	Description
+Local processing	Text detection and sanitization run in the browser runtime
+Detection	Eight supported identifier categories
+Validation	Pattern checks plus Luhn and Verhoeff checksum validation where applicable
+Sanitization	Full redaction, partial masking, and consistent pseudonymization
+File handling	Local TXT and CSV import/export, with a documented 5 MB input limit
+Browser integration	On-demand Chromium extension for supported form fields
+Persistence	No application use of localStorage, sessionStorage, IndexedDB, or cookies is reported by the supplied project tests
+Network policy	The web application declares a restrictive Content Security Policy including connect-src 'none'
 
-[![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](packages/pii-core/)
-[![Architecture](https://img.shields.io/badge/Architecture-Browser--Only-111111?style=for-the-badge)](docs/architecture/ARCHITECTURE.md)
-[![Privacy](https://img.shields.io/badge/CSP-connect--src%20'none'-30D158?style=for-the-badge)](docs/architecture/SECURITY_ARCHITECTURE.md)
-[![Manifest V3](https://img.shields.io/badge/Extension-Manifest%20V3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](extensions/blackout-guard/)
-[![Tests](https://img.shields.io/badge/Tests-32%20Passed%20(100%25)-30D158?style=for-the-badge)](tests/)
 
-**Your sensitive data should never leave your browser to become safer to share.**
+Security scope: Blackout is designed not to transmit the text being processed to a remote sanitization service. This is not a claim that the user's entire browser, operating system, or device is incapable of network communication. Review the security documentation and verify the deployed build before processing sensitive material.
 
-[GitHub Repository](https://github.com/shreyash-bhosale/Blackout) &bull; [Architecture Specs](docs/architecture/ARCHITECTURE.md) &bull; [Hackathon Demo Guide](docs/hackathon/DEMO.md) &bull; [Technical Judge Q&A](docs/hackathon/QA.md)
+💡 The Problem
+Sensitive information can appear in ordinary day-to-day work:
+- Developers paste production-like logs into public issue trackers.
+- Support teams share customer tickets with external vendors.
+- Analysts distribute CSV samples containing customer identifiers.
+- Teams include private data in prompts sent to external AI services.
+- People share screenshots or copied text without noticing embedded identifiers.
+Why cloud redaction can create another risk
+A cloud-based redaction workflow may require the original document to be uploaded before it can be sanitized. That creates an additional point where sensitive content is transmitted, processed, or retained.
 
-</div>
+Blackout takes a different approach:
 
----
-
-## 📑 Table of Contents
-
-- [Product Overview](#-product-overview)
-- [The Problem and Our Approach](#-the-problem-and-our-approach)
-- [Two-Product Ecosystem](#-two-product-ecosystem)
-- [Core Features](#-core-features)
-  - [Deterministic PII Detection Engine](#deterministic-pii-detection-engine)
-  - [Three Sanitization Modes](#three-sanitization-modes)
-  - [Side-by-Side Reactive Workspace](#side-by-side-reactive-workspace)
-  - [Tabular Audit Inspector](#tabular-audit-inspector)
-  - [In-Memory File Processing](#in-memory-file-processing)
-- [Blackout Guard — Browser Extension](#-blackout-guard--browser-extension)
-- [Privacy & Security Architecture](#-privacy--security-architecture)
-- [Technical Architecture](#-technical-architecture)
-- [Data Flow](#-data-flow)
-- [Repository Structure](#-repository-structure)
-- [Technology Stack](#-technology-stack)
-- [Security & Threat Boundaries](#-security--threat-boundaries)
-- [Installation & Quick Start](#-installation--quick-start)
-- [Automated Testing & Verification](#-automated-testing--verification)
-- [Privacy Verification Guide](#-privacy-verification-guide)
-- [Known Limitations](#-known-limitations)
-- [Roadmap](#-roadmap)
-- [Hackathon Presentation Matrix](#-hackathon-presentation-matrix)
-- [License & Author](#-license--author)
-
----
-
-## 🔍 Product Overview
-
-**Blackout** is an open-source, client-side cybersecurity and privacy platform that detects sensitive personally identifiable information (PII) in text and documents and allows users to sanitize it locally before sharing.
-
-Whether you are sanitizing application server logs before posting to GitHub, scrubbing customer tickets before sending to third-party vendors, or preparing prompts for public AI models (ChatGPT, Claude), Blackout guarantees that **no sensitive data ever crosses a network boundary during sanitization**.
-
-### Core Architecture Tenets
-
-| Architectural Tenet | Concrete Implementation |
-| :--- | :--- |
-| **Local Browser Execution** | All detection regular expressions, checksum calculations, and token replacements execute in tab memory. |
-| **Zero Network Transmission** | Hard Content Security Policy (`connect-src 'none'`) physically blocks all outbound HTTP/S, WebSocket, and Beacon requests. |
-| **Zero Application Persistence** | Zero usage of `localStorage`, `sessionStorage`, `IndexedDB`, or cookies. Data resides exclusively in volatile RAM. |
-| **Algorithmic Validation** | Pattern matching backed by mathematical checksums (Verhoeff dihedral group $D_5$ for Aadhaar, Luhn for cards). |
-| **Dual Form Factor** | Standalone single-file reactive web platform paired with a companion Manifest V3 browser extension. |
-
----
-
-## 💡 The Problem and Our Approach
-
-### The Problem: Accidental PII Leakage
-Sensitive personal information frequently leaks through routine engineering, operational, and support workflows:
-- Software engineers copying server logs with IP addresses, emails, and phone numbers onto public forums or issue trackers.
-- Customer support specialists escalating tickets containing credit card numbers and PAN identifiers to external SaaS vendors.
-- Analysts sharing CSV customer samples.
-- Professionals pasting confidential prompts into cloud LLMs.
-
-### The Paradox of Cloud Redaction Tools
-Most online sanitization utilities require users to upload confidential documents to a remote cloud server for processing. This introduces third-party data transit risks, creates single points of compromise, and violates compliance requirements (GDPR, India's DPDP Act, HIPAA, and PCI-DSS).
-
-### Our Approach: Inverted Processing
-Blackout inverts the traditional redaction pipeline. Instead of moving data to the processor, we move the processor to the data:
-
-```
-[ Sensitive User Content ]
-            │
-            ▼ (100% In-Browser Volatile RAM)
-┌─────────────────────────────────────────────────────────┐
-│  Blackout Engine: Detect ──► Validate ──► Sanitize      │
-│  (Zero Network Calls &bull; Zero Server &bull; Zero Storage)    │
-└─────────────────────────────────────────────────────────┘
-            │
-            ▼
-[ Sanitized Output Ready for Public Sharing ]
-```
-
----
-
-## 🛡️ Two-Product Ecosystem
-
-Blackout addresses privacy at two distinct user touchpoints:
-
-| Product | Primary Purpose | Form Factor |
-| :--- | :--- | :--- |
-| **Blackout Web Application** | Deep inspection, side-by-side diffing, audit logging, and bulk TXT/CSV file sanitization. | Standalone zero-build HTML/CSS/JS application ([`index.html`](index.html)). |
-| **Blackout Guard** | In-situ scanning and sanitization of form fields, inputs, textareas, and live paste protection directly on third-party web pages. | Manifest V3 Chromium browser extension ([`extensions/blackout-guard`](extensions/blackout-guard/)). |
-
-Both products share the identical deterministic detection and sanitization core ([`packages/pii-core`](packages/pii-core/)), verified via automated synchronization suites.
-
----
-
-## ⚡ Core Features
-
-### Deterministic PII Detection Engine
-
-Blackout combines syntactic regular expressions with mathematical checksum algorithms to achieve high precision and low false positives across 8 supported categories:
-
-| PII Category | Verification Method | Decoy Rejection / Boundary Logic |
-| :--- | :--- | :--- |
-| **Payment Cards** | **Luhn mod-10 Checksum Algorithm** (13–19 digits) | Rejects repeated-digit sequences (e.g. `1111 1111 1111 1111`). Digit boundaries prevent partial matches from longer IDs. |
-| **Aadhaar Numbers** | **Verhoeff Algorithm** (Dihedral group $D_5$ permutations, 12 digits) | Rejects leading `0` or `1`. Validates checksum table transitions across permutations. |
-| **PAN Identifiers** | **Structural Regex + 4th-char Entity Code Validation** (`[A-Z]{5}\d{4}[A-Z]`) | Validates 4th character against official tax status types: `P` (Individual), `C` (Company), `H` (HUF), `F` (Firm), `A`, `T`, `B`, `L`, `J`, `G`. |
-| **Email Addresses** | **RFC 5322 Syntax Boundary** | Negative lookbehind and lookahead prevent mid-token extraction. |
-| **IPv4 Addresses** | **Strict Octet Validation (0–255)** | Rejects invalid octets (e.g. `999.12.1.5` is discarded as a decoy). |
-| **IPv6 Addresses** | **Full 8-Group Hexadecimal Matching** | Validates 8 complete hex groups. *(Compressed formats like `::1` are documented as unsupported).* |
-| **Indian Phone** | **Mobile Prefix + 10-digit Sequence** | Matches `+91`, `0091`, `0`, or bare 10-digit formats starting with `6`, `7`, `8`, or `9`. |
-| **International Phone** | **E.164 Global Pattern Matching** | Validates global international prefixes with boundary controls. |
-
-#### Disjoint Interval Resolution
-When overlapping patterns match (for example, a 16-digit card containing a phone substring), Blackout uses an interval resolver based on detector priority and longest-match span. Overlapping intervals are suppressed using a `Uint8Array` bitmap of document byte offsets.
-
----
-
-### Three Sanitization Modes
-
-Users can switch sanitization strategies dynamically without re-scanning:
-
-1. **Full Redaction (`full`):**
-   - Replaces detected sensitive entities with literal `[REDACTED]`.
-   - *Best for:* Public bug reports, open-source issue trackers, and external disclosure.
-2. **Partial Masking (`partial`):**
-   - Preserves minimal structural characters for debugging context while obscuring the identifier:
-     - **Cards / Aadhaar / Phone:** Preserves the last 4 digits (`XXXX XXXX XXXX 1111`).
-     - **PAN:** Preserves the 4th entity code and final character (`XXXXXX234F`).
-     - **Email:** Preserves first letter and domain (`a***@domain.com`).
-     - **IPv4:** Preserves first two network octets (`192.168.X.X`).
-   - *Best for:* Internal engineering logs and operational triage.
-3. **Consistent Pseudonymization (`pseudo`):**
-   - Replaces entities with sequential category-specific tokens (`EMAIL_01`, `CARD_01`, `IP_01`).
-   - Normalizes representations so repeated occurrences of the same normalized entity share the identical alias throughout the document.
-   - *Best for:* Data science, CSV datasets, and cross-log correlation without identity exposure.
-
----
-
-### Side-by-Side Reactive Workspace
-
-- **Synchronized Dual-Pane Editor:** Direct side-by-side comparison of original text and sanitized output.
-- **Entity Highlighting:** Highlight view displays color-coded category tags over sanitized tokens.
-- **Metrics Bar:** Real-time character counts, line counts, and entity tallies updated on every keystroke.
-- **Built-in Noisy Sample:** One-click loader with 16 genuine PII items and deliberate decoys for instant demonstration.
-
----
-
-### Tabular Audit Inspector
-
-- Detailed table displaying every detected entity with its sequential ID, category badge, physical line number (calculated via binary search), original value, and sanitized replacement preview.
-- **Category Filter:** Filter findings by category (Email, Card, Aadhaar, PAN, IP, Phone).
-- **Display Limit:** Caps rendering at 500 rows to maintain smooth 60 FPS DOM performance on massive files.
-
----
-
-### In-Memory File Processing
-
-- Supports local import of `.txt` and `.csv` files up to **5 MB** using the HTML5 File API.
-- **CSV Preservation:** Preserves raw CSV row delimiters, column integrity, and commas during string replacement.
-- **Zero-Network Export:** Downloads `.sanitized.txt` or `.sanitized.csv` directly via ephemeral in-memory Blob URLs (`URL.createObjectURL`).
-
----
-
-## 🌐 Blackout Guard — Browser Extension
-
-**Blackout Guard** is a Manifest V3 browser extension for Chromium browsers (Chrome, Edge, Brave) that brings Blackout's detection engine directly to web forms, textareas, and inputs.
-
+Bring the processing logic to the user's browser instead of sending the user's content to a remote processor.
+🔄 How Blackout Works
 ```mermaid
 flowchart TD
-    A["Webpage Form Field"] -->|User Clicks Extension| B["Blackout Guard Popup"]
-    B -->|chrome.scripting (On-Demand)| C["Inject pii-core.js & content.js"]
-    C --> D["Discover Supported Editable Fields"]
-    D --> E["Execute Pure Checksum Detection"]
-    E -->|PII Found| F["Mount Shadow DOM Badges (e.g. '2 PII')"]
-    F --> G["Popup Displays Masked Previews"]
-    G -->|User Selects Mode & Wipes| H["Prototype Setter Dispatches React Input Event"]
-    H --> I["Field Value Sanitized in Place"]
-    I --> J["Save Ephemeral In-Memory Undo Snapshot"]
-    J -->|User Clicks Undo| K["Restore Original Value from Memory"]
+    A["Original text or local file"] --> B["Blackout browser workspace"]
+    B --> C["Deterministic PII detection"]
+    C --> D["Identifier validation"]
+    D --> E["Overlap resolution"]
+    E --> F["User selects sanitization mode"]
+    F --> G["Sanitized output"]
+    G --> H["Review, copy, or export locally"]
 ```
+The core processing path is designed to run in the browser's memory. The application does not need a backend processing service for its described detection and sanitization workflow.
+🧩 Product Ecosystem
+Blackout consists of two related products powered by a shared core.
+Product	Purpose	Form factor
+Blackout Web Application	Document inspection, side-by-side comparison, audit findings, and TXT/CSV sanitization	Standalone HTML/CSS/JavaScript application
+Blackout Guard	On-demand scanning and sanitization of supported form fields on web pages	Chromium Manifest V3 extension
+PII Core	Canonical detection, validation, overlap resolution, and sanitization logic	Shared JavaScript package
 
-### Key Extension Capabilities
 
-- **On-Demand Execution:** Injected programmatically only when the user invokes the extension. Zero persistent background workers.
-- **Strict Field Exclusions:** Inputs of type `password` and `hidden` are strictly excluded **before** `.value` is ever accessed.
-- **Isolated Shadow DOM:** Indicator badges (`1 PII`, `2 PII`) are isolated in Shadow DOM hosts, preventing host-page CSS interference.
-- **React & Framework Prototype Setters:** Overrides native prototype descriptors (`Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set`) and dispatches bubbling `input` and `change` events so modern reactive frameworks (React, Vue, Angular) immediately sync state.
-- **Guard Mode (Real-Time Paste Interceptor):** Opt-in stretch feature that intercepts clipboard paste events on form fields. If PII is detected in clipboard text, it presents an isolated decision dialog offering:
-  1. *Redact & Paste (Mode-Specific)*
-  2. *Paste Anyway (Unsafe)*
-  3. *Cancel*
-- **Tab-Scoped Undo:** Restores original field values from an ephemeral in-memory snapshot within the active tab session.
+The canonical engine lives in packages/pii-core/. The extension contains a synchronized distribution of the core, with a parity test intended to detect drift.
+⚡ Features
+1. Deterministic PII Detection Engine
+Blackout combines pattern matching with validation rules to reduce obvious false positives. The supplied implementation describes eight supported categories.
+Category	Detection / validation approach	Important boundary
+Payment card numbers	Luhn mod-10 checksum; 13–19 digits	Repeated-digit sequences are rejected; digit boundaries reduce partial matches
+Aadhaar numbers	12-digit structure and Verhoeff checksum	Leading 0 and 1 are rejected
+PAN identifiers	Structural pattern plus fourth-character entity-code validation	Checks the supported entity-code set
+Email addresses	Email-oriented syntax pattern and token boundaries	Not a complete implementation of every possible email syntax
+IPv4 addresses	Four-octet validation	Each octet must be in the 0–255 range
+IPv6 addresses	Full eight-group hexadecimal pattern	Compressed forms are currently unsupported
+Indian phone numbers	Indian mobile-oriented pattern	Supports documented +91, 0091, 0, and bare-number forms
+International phone numbers	E.164-oriented pattern	Pattern-based validation; not carrier or subscriber verification
 
----
 
-## 🔒 Privacy & Security Architecture
+Checksum validation
+- Luhn algorithm: Used to validate candidate payment-card-like digit sequences.
+- Verhoeff algorithm: Used for Aadhaar candidate validation. The algorithm uses permutation and multiplication tables associated with the dihedral group \(D_5\).
+A valid checksum does not prove that an identifier was issued, is active, or belongs to a particular person. It only validates the candidate against the implemented mathematical rule.
+Overlap resolution
+A sequence of digits can resemble more than one identifier type. Blackout resolves overlapping candidate matches using detector priority and match span.
 
-Blackout is designed from the ground up around zero-trust client-side boundaries.
+The supplied implementation describes a Uint8Array-based interval collision check to keep accepted findings disjoint. This prevents multiple sanitization operations from competing for the same text range.
+2. Three Sanitization Modes
+Users can choose a sanitization strategy after detection.
+Mode	Behavior	Example use
+Full redaction (full)	Replaces detected values with [REDACTED]	Public bug reports and external sharing
+Partial masking (partial)	Preserves selected structural characters while obscuring the rest	Internal troubleshooting
+Pseudonymization (pseudo)	Replaces normalized values with stable, category-specific aliases within a document	Dataset exploration and log correlation
 
+
+Examples of the documented output behavior:
+Category	Partial masking example	Pseudonym example
+Card / Aadhaar / phone	XXXX XXXX XXXX 1111	CARD_01 / category token
+PAN	XXXXXX234F	PAN_01
+Email	a***@domain.com	EMAIL_01
+IPv4	192.168.X.X	IP_01
+
+
+Pseudonymization is not anonymization. Stable aliases can preserve relationships between records, and the mapping may reveal patterns. Treat pseudonymized output according to the sensitivity of the source data.
+3. Side-by-Side Workspace
+The web application provides a workspace for reviewing original and sanitized content.
+- Dual-pane comparison: Original input and sanitized output appear side by side.
+- Entity highlighting: Detected categories can be highlighted in the output view.
+- Live metrics: Character counts, line counts, and entity totals update as the input changes.
+- Sample data: A built-in sample is provided for demonstrating detection, including deliberate decoys.
+- Mode switching: Change the sanitization strategy without needing to manually rewrite the source text.
+4. Audit Inspector
+The audit view presents detected entities in a structured table.
+
+Documented capabilities include:
+- Sequential finding identifiers.
+- PII category labels.
+- Physical line numbers.
+- Original values and sanitized replacement previews.
+- Category-based filtering.
+- A rendering cap of 500 rows to help keep large result tables responsive.
+Privacy note: The audit view can display original detected values. Review the screen before sharing a screenshot or screen recording.
+5. Local File Processing
+The web application supports local TXT and CSV workflows using the browser File API.
+- Import .txt and .csv files.
+- Documented input limit: 5 MB.
+- Process imported content in browser memory.
+- Preserve CSV delimiters and column structure during string replacement, as covered by the supplied integration-test description.
+- Export sanitized output using browser-generated Blob URLs.
+Supported output extensions:
+- .sanitized.txt
+- .sanitized.csv
+The file workflow is intended for local processing. Confirm the behavior of the exact build you use, especially if it has been modified or deployed with additional scripts.
+6. Blackout Guard — Browser Extension
+Blackout Guard brings on-demand PII scanning to supported editable fields on Chromium-based browsers, including Chrome, Edge, and Brave.
 ```mermaid
 flowchart TD
-    subgraph ClientHost ["User's Local Machine"]
-        User["User Interaction"] --> Browser["Web Browser Runtime"]
-        
-        subgraph IsolationBoundary ["Blackout Isolation Boundary"]
-            CSP["Content Security Policy: connect-src 'none'"]
-            RAM["Volatile Heap Memory (No Storage APIs)"]
-            Engine["Deterministic PII Engine & Checksums"]
-            BlobGen["In-Memory Blob File Exporter"]
-        end
-        
-        Browser --> CSP
-        CSP --> RAM
-        RAM --> Engine
-        Engine --> BlobGen
-        BlobGen --> User
-    end
-
-    subgraph ExternalWorld ["Untrusted External Network"]
-        RemoteServer["Third-Party Cloud Servers"]
-        Analytics["Tracking & Telemetry Services"]
-        LLM["External AI APIs"]
-    end
-
-    IsolationBoundary -. "PHYSICALLY BLOCKED BY CSP" .-x RemoteServer
-    IsolationBoundary -. "NO TELEMETRY IMPLEMENTED" .-x Analytics
-    IsolationBoundary -. "NO EXTERNAL NETWORK CALLS" .-x LLM
+    A["User opens a web page"] --> B["User invokes Blackout Guard"]
+    B --> C["On-demand script injection"]
+    C --> D["Discover supported editable fields"]
+    D --> E["Exclude password and hidden inputs"]
+    E --> F["Run local PII detection"]
+    F --> G["Show findings in extension UI"]
+    G --> H["User reviews masked previews"]
+    H --> I["User chooses a sanitization mode"]
+    I --> J["Sanitize selected field"]
+    J --> K["Keep temporary undo snapshot in tab memory"]
 ```
-
-### Verified Security Controls
-
-1. **Content Security Policy Enforced:**  
-   `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src data:;">`
-2. **Zero Persistent Storage:**  
-   Automated audits verify `0` references to `localStorage`, `sessionStorage`, `IndexedDB`, or cookies.
-3. **XSS Protection:**  
-   Pasted input is escaped via HTML entity translation before being rendered into the DOM.
-4. **Least-Privilege Extension Manifest:**  
-   Declares strictly `["activeTab", "scripting"]`. Zero `<all_urls>`, zero host permissions, and zero persistent background scripts.
-
----
-
-## 🏗️ Technical Architecture
-
-Blackout is structured as a modular repository separating canonical pure business logic, web presentation, browser extensions, and testing:
-
+Extension capabilities
+- On-demand execution: Scripts are injected when the user invokes the extension, rather than relying on a persistent background worker.
+- Sensitive-field exclusions: Password and hidden inputs are excluded before their values are accessed, according to the supplied implementation description.
+- Shadow DOM indicators: Isolated badges can show the number of detected findings without relying on the host page's styling.
+- Framework-aware updates: The extension uses native input value setters and dispatches input/change events to help supported reactive frameworks recognize updates.
+- Tab-scoped undo: An in-memory snapshot can restore a field during the active tab session.
+- Optional Guard Mode: A paste-interception workflow can offer redact-and-paste, paste-anyway, or cancel choices when PII is detected.
+The extension operates within browser and page constraints. It does not claim compatibility with every web editor or every framework implementation.
+🏗️ Architecture
+Blackout separates its canonical business logic from the web presentation layer, browser extension, and verification tooling.
 ```mermaid
 flowchart TB
-    subgraph CanonicalCore ["Canonical Engine (packages/pii-core)"]
-        Validators["Validators (Luhn, Verhoeff)"]
-        Detectors["Detectors (8 Pattern Categories)"]
-        Intervals["Interval Match Resolver"]
-        Sanitizers["Sanitizers (Full, Partial, Pseudo)"]
+    subgraph CORE["Canonical PII Core"]
+        V["Validators"]
+        D["PII Detectors"]
+        R["Overlap Resolver"]
+        S["Sanitization Engine"]
+        V --> D --> R --> S
     end
 
-    subgraph WebPresentation ["Web Application (apps/web)"]
-        WebEntry["index.html / pii-sanitizer.html"]
-        WebStyles["Modular Tokens & Layout CSS"]
-        CanvasDrift["WebGL Mesh Drift Background"]
-        DiffState["UI State & Diff Controller"]
+    subgraph WEB["Web Application"]
+        UI["Standalone HTML Interface"]
+        WCSS["CSS and Design Tokens"]
+        CTRL["Workspace Controller"]
+        UI --> CTRL
+        WCSS --> UI
     end
 
-    subgraph BrowserExt ["Browser Extension (extensions/blackout-guard)"]
-        ExtManifest["Manifest V3 Config"]
-        ExtPopup["Popup UI & Metrics"]
-        ExtContent["Content Script & Shadow DOM"]
-        ExtGuard["Guard Mode Paste Interceptor"]
+    subgraph EXT["Blackout Guard"]
+        POP["Extension Popup"]
+        CONTENT["Content Script"]
+        SHADOW["Shadow DOM Indicators"]
+        POP --> CONTENT --> SHADOW
     end
 
-    subgraph QualityAssurance ["Verification Infrastructure (tests & scripts)"]
-        MasterRunner["scripts/run-tests.js"]
-        ParityScript["scripts/verify-core-parity.js"]
-        StructureValidator["scripts/validate-structure.js"]
-        TestSuites["6 Domain-Specific Test Suites (32 Tests)"]
+    subgraph QA["Verification"]
+        UNIT["Core Tests"]
+        HARD["Security Tests"]
+        PARITY["Core Parity Check"]
+        STRUCT["Structure Validation"]
     end
 
-    CanonicalCore -->|Source of Truth| WebEntry
-    CanonicalCore -->|Source of Truth| ExtContent
-    QualityAssurance -.-> CanonicalCore
-    QualityAssurance -.-> WebPresentation
-    QualityAssurance -.-> BrowserExt
+    CORE --> WEB
+    CORE --> EXT
+    QA -. verifies .-> CORE
+    QA -. verifies .-> WEB
+    QA -. verifies .-> EXT
 ```
+Architectural principles
+Principle	Implementation described by the project
+Local-first processing	Detection and sanitization run in the browser runtime
+Shared business logic	A canonical core is distributed to the web application and extension
+Minimal dependencies	Core logic is written in vanilla JavaScript
+No application database	The described sanitization workflow does not require a server-side database
+Limited persistence	Application content is intended to remain in volatile memory
+Testable boundaries	Dedicated tests cover algorithms, security properties, extension behavior, and core parity
 
----
 
-## 🔄 Data Flow
-
+🔁 Data Flow
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant UI as Workspace UI
-    participant Core as PII Detection Core
+    participant UI as Blackout Workspace
+    participant Core as PII Core
     participant Resolver as Overlap Resolver
-    participant Sanitizer as Sanitization Engine
-    participant Export as In-Memory Exporter
+    participant Sanitizer as Sanitizer
+    participant Export as Browser Export
 
-    User->>UI: Paste text or import local TXT/CSV file
-    UI->>Core: Pass raw string to detect()
-    Core->>Core: Regex scanning across 8 categories
-    Core->>Core: Execute Luhn / Verhoeff checksum algorithms
-    Core->>Resolver: Forward candidate intervals
-    Resolver->>Resolver: Disjoint interval sort & Uint8Array collision check
-    Resolver-->>UI: Return accepted non-overlapping findings
-    UI->>Sanitizer: Execute sanitize(text, findings, mode)
-    Sanitizer-->>UI: Return sanitized string & token map
-    UI->>UI: Update reactive diff panes, badges & audit table
-    User->>UI: Click "Download .txt" or "Download .csv"
-    UI->>Export: Create Blob URL (text/plain or text/csv)
-    Export-->>User: Trigger local browser download
+    User->>UI: Paste text or import local file
+    UI->>Core: Submit source text
+    Core->>Core: Scan supported PII patterns
+    Core->>Core: Validate applicable checksums
+    Core->>Resolver: Send candidate ranges
+    Resolver-->>UI: Return accepted findings
+    UI->>Sanitizer: Apply selected mode
+    Sanitizer-->>UI: Return sanitized output
+    UI-->>User: Display findings and output
+    User->>Export: Request local download
+    Export-->>User: Generate browser download
 ```
+No remote processing API is required by this documented workflow.
+🔒 Privacy and Security
+Privacy is a core architectural requirement, not an optional feature.
+Documented controls
+Control	Project implementation
+Content Security Policy	Web application policy includes connect-src 'none'
+Persistent browser storage	The supplied project description reports no use of localStorage, sessionStorage, IndexedDB, or cookies for application data
+External assets	Security tests are described as checking for external asset dependencies
+Input rendering	Pasted input is escaped before being rendered into the DOM
+Extension permissions	Manifest is described as using activeTab and scripting, without broad <all_urls> host access
+Password and hidden fields	Extension excludes these input types before reading their values
+Extension background execution	No persistent background worker is described
+Temporary undo	Original field values are held in tab-scoped memory
 
----
 
-## 📁 Repository Structure
+Content Security Policy
+The supplied web application describes a policy similar to:
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src data:;"
+>
+This policy is intended to restrict resource loading and block connection-based requests initiated by the protected document. Review the actual deployed HTML and browser enforcement before relying on it as a security boundary.
+Zero-persistence design
+The application is designed to avoid writing processed content to browser persistence APIs. Data held in memory is temporary, but memory is not a secure vault: browser extensions, debugging tools, compromised processes, or other software with sufficient access may still expose it.
+Least-privilege extension model
+The extension is described as using:
+{
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ]
+}
+The actual manifest.json is authoritative. Review it before installation, and do not assume that every future build retains the same permissions.
+🧭 Threat Model and Limitations
+What Blackout is designed to reduce
+- Accidental sharing of supported identifiers in text.
+- Exposure to a third-party redaction server during the documented local processing workflow.
+- Persistent application copies in common browser storage APIs.
+- Unintended access to password and hidden form-field values by the extension's scanner.
+What Blackout does not protect against
+- Malware, keyloggers, screen capture, or a compromised operating system.
+- A compromised browser or malicious browser extension.
+- Users manually copying or sharing the original unredacted content.
+- Sensitive information that is not covered by the implemented detectors.
+- Context-dependent information requiring semantic understanding.
+- Every possible browser communication channel or behavior of unrelated browser components.
+- A modified or compromised distribution of the application.
+Blackout is a privacy-assistance tool. It does not replace organizational data-handling policies, legal review, or a complete data-loss-prevention system.
+🛠️ Technology Stack
+Layer	Technology	Purpose
+Core engine	Vanilla JavaScript (ES6+)	Detection, validation, matching, and sanitization
+Checksum validation	Luhn and Verhoeff	Candidate identifier validation
+Web application	HTML5, CSS3, JavaScript	Standalone browser workspace
+Visual background	WebGL	Ambient mesh-drift visual effect
+Browser integration	Chromium Manifest V3	On-demand page-field scanning
+File processing	HTML5 File API	Local TXT/CSV import
+File export	Blob URLs	Browser-generated downloads
+Testing	Node.js test runner and assertions	Automated verification
+Structure checks	Custom Node.js scripts	Repository boundary and parity checks
 
-```text
-blackout/
-├── README.md                           # Master technical showcase & quickstart
-├── AGENTS.md                           # Strict development constraints & agent rules
-├── .gitignore                          # Clean environment ignore rules
+
+📁 Repository Structure
+The following tree reflects the project layout supplied for this README. Confirm it against the current repository before treating it as an exhaustive file listing.
+Blackout/
+├── README.md
+├── AGENTS.md
+├── .gitignore
 │
 ├── packages/
-│   └── pii-core/                       # Canonical PII Detection & Sanitization Package
-│       ├── package.json                # Package definition
-│       ├── README.md                   # Core documentation
+│   └── pii-core/
+│       ├── package.json
+│       ├── README.md
 │       └── src/
-│           ├── index.js                # Universal aggregator export (Node, Web, Extension)
-│           ├── constants/tables.js     # Verhoeff D5 tables & IPv4 regex octet definitions
-│           ├── validators/             # Pure mathematical checksum validators (Luhn, Verhoeff)
-│           ├── detectors/index.js      # Ordered priority detectors
-│           ├── matching/               # Disjoint interval resolution & digit boundary protection
-│           ├── normalization/          # Intra-document pseudonymization keys
-│           └── sanitizers/             # Unified multi-mode sanitizer (Full, Partial, Pseudo)
+│           ├── index.js
+│           ├── constants/
+│           │   └── tables.js
+│           ├── validators/
+│           ├── detectors/
+│           ├── matching/
+│           ├── normalization/
+│           └── sanitizers/
 │
 ├── apps/
-│   └── web/                            # Web Application Presentation Layer
-│       ├── index.html                  # Web application presentation shell
-│       ├── README.md                   # Web layer architecture & features
-│       ├── styles/tokens.css           # Design tokens, themes (Dark/Light), typography
-│       └── scripts/                    # WebGL canvas background & UI controller
+│   └── web/
+│       ├── index.html
+│       ├── README.md
+│       ├── styles/
+│       │   └── tokens.css
+│       └── scripts/
 │
 ├── extensions/
-│   └── blackout-guard/                 # Manifest V3 Browser Extension Architecture
-│       ├── manifest.json               # Least privilege config (activeTab, scripting)
-│       ├── README.md                   # Extension security & installation guide
-│       ├── popup/                      # Extension popup UI & controller
-│       ├── content/content.js          # DOM field scanner, React prototype setters, Guard paste
-│       ├── core/pii-core.js            # Synchronized core distribution
-│       └── test/test-page.html         # Local testbed with 8 form types & React simulator
+│   └── blackout-guard/
+│       ├── manifest.json
+│       ├── README.md
+│       ├── popup/
+│       ├── content/
+│       │   └── content.js
+│       ├── core/
+│       │   └── pii-core.js
+│       └── test/
+│           └── test-page.html
 │
-├── tests/                              # Verification Suites
-│   ├── core.test.js                    # 10 algorithmic unit tests
-│   ├── hardening.test.js               # 5 CSP, security, zero-storage tests
-│   ├── integration.test.js             # 4 CSV and diff flow tests
-│   ├── extension-core-sync.test.js     # Exact parity verification
-│   ├── extension-flow.test.js          # 5 extension DOM & React setter tests
-│   └── extension-hardening.test.js     # 7 extension security & privacy tests
+├── tests/
+│   ├── core.test.js
+│   ├── hardening.test.js
+│   ├── integration.test.js
+│   ├── extension-core-sync.test.js
+│   ├── extension-flow.test.js
+│   └── extension-hardening.test.js
 │
-├── scripts/                            # Operational Automation
-│   ├── run-tests.js                    # Master test runner (executes all suites)
-│   ├── verify-core-parity.js           # Multi-target parity verifier
-│   └── validate-structure.js           # Architectural boundary validator (29 checks)
+├── scripts/
+│   ├── run-tests.js
+│   ├── verify-core-parity.js
+│   └── validate-structure.js
 │
-├── docs/                               # Organized Documentation Library
-│   ├── README.md                       # Documentation index
-│   ├── product/                        # PRD.md, API.md, DATABASE.md
-│   ├── architecture/                   # ARCHITECTURE.md, SECURITY_ARCHITECTURE.md
-│   ├── development/                    # SETUP.md, TESTING.md
-│   └── hackathon/                      # DEMO.md, QA.md, READINESS.md, PROMPT_LOG.md
+├── docs/
+│   ├── README.md
+│   ├── product/
+│   ├── architecture/
+│   │   ├── ARCHITECTURE.md
+│   │   └── SECURITY_ARCHITECTURE.md
+│   ├── development/
+│   └── hackathon/
+│       ├── DEMO.md
+│       ├── QA.md
+│       ├── READINESS.md
+│       └── PROMPT_LOG.md
 │
-├── index.html                          # Root standalone distribution entrypoint
-├── pii-sanitizer.html                  # Backward-compatible zero-build artifact
-└── blackout-guard-extension.zip        # Pre-packaged ready-to-load ZIP archive
-```
-
----
-
-## 🛠️ Technology Stack
-
-| Layer | Technology | Justification & Role |
-| :--- | :--- | :--- |
-| **PII Detection Engine** | **Pure Vanilla JavaScript (ES6+)** | Zero-dependency, portable execution across Node.js, Web Browsers, and Web Workers. |
-| **Mathematical Validation** | **Luhn & Verhoeff Algorithms** | Mod-10 and Dihedral Group $D_5$ permutations preventing false positives. |
-| **Web Presentation** | **Semantic HTML5 & Vanilla CSS3** | Standalone single-file portability with custom CSS design tokens. |
-| **Visual Motion** | **WebGL (Fragment/Vertex Shaders)** | GPU-accelerated ambient mesh drift background with negligible CPU footprint. |
-| **Browser Extension** | **Chromium Manifest V3** | Least-privilege browser integration using `activeTab`, `scripting`, and Shadow DOM. |
-| **File Processing** | **HTML5 File API & In-Memory Blobs** | Local client-side reading and generation of `.txt` and `.csv` files. |
-| **Automated Testing** | **Node.js Test Runner & Assert** | Zero third-party testing dependencies; runs out-of-the-box on standard Node.js. |
-
----
-
-## 🛡️ Security & Threat Boundaries
-
-### What Blackout Defends Against
-- **Third-Party Interception:** Data cannot be intercepted over the network because it is never transmitted over a network.
-- **Server-Side Data Breaches:** Redaction providers cannot leak your data because no server ever receives your document.
-- **Persistent Data Traces:** Tab closure immediately frees all text, tokens, and pseudonym mappings from volatile RAM.
-- **Unintended Extension Form Access:** Blackout Guard ignores password and hidden fields unconditionally before property access.
-
-### What Blackout Does Not Defend Against
-- **Compromised Host OS / Malware:** Local keyloggers, screen grabbers, or kernel malware with access to host RAM.
-- **Contextual NLP Entities:** Names, physical street addresses, and medical diagnoses that require contextual semantic models.
-- **Canvas-Based Text Editors:** Web editors rendering text purely to an HTML5 `<canvas>` (e.g. Google Docs) cannot be inspected via DOM tree traversal.
-
----
-
-## 🚀 Installation & Quick Start
-
-### 1. Web Application (Zero-Build Standalone)
-
-No installation, build step, or npm packages required:
-
-```bash
-# Clone the repository
+├── index.html
+├── pii-sanitizer.html
+└── blackout-guard-extension.zip
+🚀 Getting Started
+Prerequisites
+- Git
+- A modern browser
+- Python 3 (for the optional local static server)
+- Node.js (for running the supplied test scripts)
+1. Clone the repository
 git clone https://github.com/shreyash-bhosale/Blackout.git
 cd Blackout
-
-# Option A: Start a lightweight static server (Recommended)
+2. Run the web application
+The project provides a standalone HTML entry point. From the repository root, start a local static server:
 python3 -m http.server 8080
-# Open in browser: http://localhost:8080/index.html
+Open:
+http://localhost:8080/index.html
+You can also try opening index.html directly in a browser. A local server is recommended for consistent browser behavior.
+3. Try the workflow
+1. Load the built-in sample or paste text into the input pane.
+2. Run the detection workflow.
+3. Review detected categories and the audit table.
+4. Select full redaction, partial masking, or pseudonymization.
+5. Inspect the sanitized output.
+6. Export the result if required.
+🧩 Browser Extension Setup
+Blackout Guard is intended for Chromium-based browsers.
+1. Open chrome://extensions in Chrome, or edge://extensions in Edge.
+2. Enable Developer mode.
+3. Select Load unpacked.
+4. Choose the repository's extensions/blackout-guard/ directory.
+5. Pin Blackout Guard to the browser toolbar.
+6. Open a page containing supported editable fields.
+7. Invoke the extension and review the detected findings.
+Local extension test page
+Start the repository's local server from the project root:
+python3 -m http.server 8080
+Then open the test page at:
+http://localhost:8080/extensions/blackout-guard/test/test-page.html
+If the test page has moved in the current repository, use the actual path under extensions/blackout-guard/test/.
+Only install unpacked extensions from source you trust. Review the manifest and source code before granting browser permissions.
 
-# Option B: Direct browser execution
-open index.html
-```
-
-### 2. Blackout Guard Extension (Developer Mode)
-
-1. Open Google Chrome or Microsoft Edge and navigate to `chrome://extensions` (or `edge://extensions`).
-2. Toggle on **Developer mode** in the top right corner.
-3. Click the **Load unpacked** button.
-4. Select the `extension/` directory (or extract `blackout-guard-extension.zip`).
-5. Pin **Blackout Guard** to your browser toolbar.
-6. Test scanning on the included sandbox: [http://localhost:8080/extension/test-page.html](http://localhost:8080/extension/test-page.html).
-
----
-
-## 🧪 Automated Testing & Verification
-
-Blackout includes automated test suites covering unit algorithms, platform hardening, integration flows, and extension behavior that execute cleanly without installing external dependencies:
-
-```bash
-# Run the master test runner
+🧪 Testing and Verification
+The project description reports six test files covering the core engine, security hardening, integration behavior, extension synchronization, extension flow, and extension hardening.
+Run the master test suite
 node scripts/run-tests.js
-
-# Validate architectural boundaries
+Validate repository structure
 node scripts/validate-structure.js
-```
+Verify core parity
+node scripts/verify-core-parity.js
+Reported test coverage
+The following results are based on the project information supplied for this README. Run the commands above against the current commit to independently confirm them.
+Test suite	Coverage	Reported tests
+tests/core.test.js	Luhn, Verhoeff, detectors, decoys, overlap resolution, pseudonymization	10
+tests/hardening.test.js	CSP checks, external assets, persistence checks, escaping, stress behavior	5
+tests/integration.test.js	CSV handling, rendering, metrics, audit line numbers	4
+tests/extension-core-sync.test.js	Web and extension core synchronization	1
+tests/extension-flow.test.js	Field discovery, exclusions, setters, idempotency	5
+tests/extension-hardening.test.js	Permissions, storage, network-related checks, Shadow DOM isolation	7
+Total automated tests	Six test files	32
 
-### Verified Test Results
 
-| Test Suite File | Domain Covered | Tests | Result |
-| :--- | :--- | :---:| :---: |
-| `tests/core.test.js` | Luhn, Verhoeff, detectors, decoys, overlap resolution, pseudonym normalization | 10 | **PASS (10/10)** |
-| `tests/hardening.test.js` | CSP verification, zero external assets, zero persistence, XSS escaping, stress test | 5 | **PASS (5/5)** |
-| `tests/integration.test.js` | CSV preservation, rendering, insights calculation, audit line numbering | 4 | **PASS (4/4)** |
-| `tests/extension-core-sync.test.js`| Byte-for-byte exact synchronization between web app and extension core | 1 | **PASS (1/1)** |
-| `tests/extension-flow.test.js` | Field discovery, sensitive-field exclusion, setters, idempotency | 5 | **PASS (5/5)** |
-| `tests/extension-hardening.test.js`| Permissions, storage, network restrictions, Shadow DOM isolation | 7 | **PASS (7/7)** |
-| `scripts/verify-core-parity.js` | Multi-target parity check across canonical package, web app, and extension | 1 | **PASS (1/1)** |
-| `scripts/validate-structure.js` | 29 architectural milestones and structural boundaries | 29 | **PASS (29/29)** |
-| **Total Test Count** | **Master Verification Suite** | **33 suites/checks** | **100% GREEN** |
+The separate verification scripts also report:
+- Core parity verification.
+- 29 repository structure checks.
+These script checks are not included in the 32-test total. A passing test suite is evidence for the cases it covers, not a proof that the application is free of all vulnerabilities.
+🔬 Privacy Verification
+Security claims should be independently testable. The following checks can help reviewers inspect the behavior of a local build.
+1. Inspect network activity
+1. Open the application in the browser.
+2. Open Developer Tools.
+3. Select the Network panel.
+4. Enable Preserve log.
+5. Load sample content, scan it, change sanitization modes, and export a file.
+6. Inspect requests initiated by the application.
+The expected result for the documented local sanitization workflow is that the application does not send the source text to a remote processing endpoint. Check the actual browser trace rather than relying only on a README claim.
+2. Inspect browser storage
+In Developer Tools, open the Application or Storage panel and inspect:
+- Local Storage
+- Session Storage
+- IndexedDB
+- Cookies
+The documented design does not use these APIs to persist processed content. Verify the current build and any browser behavior independently.
+3. Test while offline
+1. Load the local application.
+2. Open Developer Tools and select the Network panel.
+3. Set network throttling to Offline.
+4. Try the documented text detection and sanitization workflow.
+5. Try local file import and export.
+The standalone local workflow is designed to operate without a remote processing service. This test should be performed on the exact build being evaluated.
+4. Inspect extension permissions
+Open the extension's manifest.json and review its declared permissions, content scripts, host permissions, and background configuration.
+⚠️ Known Limitations
+Blackout intentionally documents areas where its current deterministic approach has limited coverage.
+Limitation	Current behavior
+Contextual named entities	Person names, organizations, and context-dependent addresses are not covered by the described deterministic detector set
+Compressed IPv6	Short forms such as ::1 and fe80::1 are not currently supported
+Phone-number ambiguity	Some unrelated 10-digit numeric sequences beginning with Indian mobile prefixes may be flagged
+Canvas-based editors	Text rendered only to a canvas is not available through ordinary DOM field traversal
+Extension undo	Temporary undo data is lost when the relevant tab is closed or navigated away from
+Identifier validity	Checksum and format validation do not establish whether an identifier was issued or is currently active
+Detection coverage	Unsupported formats, unusual separators, OCR text, and unrecognized identifiers may be missed
 
----
 
-## 🔬 Privacy Verification Guide
+Always review sanitized output before sharing it. Automated detection cannot guarantee that every sensitive detail has been found.
+🗺️ Roadmap
+Potential future improvements identified for the project:
+- [ ] Local contextual NER: Explore a lightweight ONNX/WebAssembly model for local recognition of names and organizations.
+- [ ] Compressed IPv6 support: Add parsing for compressed IPv6 representations.
+- [ ] Custom detection rules: Allow users or security teams to define additional identifier patterns.
+- [ ] Document risk scoring: Estimate document sensitivity using detected entity categories and counts.
+- [ ] Expanded extension testing: Add automated browser journeys across a wider range of web applications.
+- [ ] Improved format coverage: Expand tests for international identifiers, separators, and edge cases.
+Roadmap items are proposals, not claims that these capabilities are currently implemented.
+🏆 Hackathon Evaluation
+Evaluation area	Blackout's approach
+Problem relevance	Addresses accidental exposure of personal identifiers in logs, support tickets, datasets, and AI prompts
+Technical approach	Combines deterministic detection, checksum validation, and overlap resolution
+Privacy by design	Keeps the documented sanitization workflow in the browser rather than requiring a remote processing server
+Engineering structure	Separates canonical core logic, web UI, browser extension, tests, and documentation
+Verification	Includes algorithm, integration, hardening, parity, and structure checks
+Practical usability	Offers three sanitization modes, local file workflows, an audit view, and browser form-field assistance
 
-We encourage technical judges and security evaluators to independently verify our privacy guarantees using browser Developer Tools:
 
-### 1. Network Activity Verification
-1. Open [`index.html`](index.html) in your browser.
-2. Open Developer Tools (`Cmd+Option+I` or `F12`) and select the **Network** tab.
-3. Check **Preserve log**.
-4. Click **Load Sample**, click **Scan Document**, switch sanitization modes, and export files.
-5. **Observed Result:** Exactly **0** HTTP/S, WebSocket, or Beacon network requests.
+Suggested live demonstration
+1. Show a sample document containing supported identifiers and deliberate decoys.
+2. Run detection and explain why checksum validation matters.
+3. Show the audit inspector and category filters.
+4. Switch between full redaction, partial masking, and pseudonymization.
+5. Import and export a local TXT or CSV file.
+6. Demonstrate Blackout Guard on the local extension test page.
+7. Use Developer Tools to inspect network activity and browser storage.
+See [the hackathon demo guide](docs/hackathon/DEMO.md) and [technical judge Q&A](docs/hackathon/QA.md) for the project's supporting presentation material.
+🤝 Contributing
+Contributions, bug reports, and suggestions are welcome.
 
-### 2. Storage Persistence Verification
-1. In Developer Tools, select the **Application** (or **Storage**) tab.
-2. Inspect:
-   - **Local Storage:** `0` entries.
-   - **Session Storage:** `0` entries.
-   - **IndexedDB:** No databases created.
-   - **Cookies:** `0` cookies set.
+Before submitting a change:
+1. Read the project development guidance in AGENTS.md.
+2. Keep the canonical detection and sanitization logic in packages/pii-core/.
+3. If core behavior changes, update the synchronized extension distribution.
+4. Add or update tests for new detection rules and edge cases.
+5. Run the master test suite and structural validation.
+6. Update relevant documentation.
+Please avoid submitting real personal identifiers, credentials, or confidential documents in issues, pull requests, or test fixtures. Use clearly synthetic test data.
+Reporting a vulnerability
+Do not publish real sensitive data or exploit details in a public issue. Use an appropriate private reporting channel if one is configured for the repository. If no private security contact is listed, contact the maintainer before disclosing sensitive details publicly.
+📄 License and Author
+- Author: Shreyash Bhosale
+- GitHub: @shreyash-bhosale
+- Repository: shreyash-bhosale/Blackout
+- License: MIT — see LICENSE.
+- Challenge: PromptWars × NIAT_Pune Cybersecurity & Data Privacy Hackathon Challenge.
+<div align="center">BLACKOUT
+Detect. Classify. Redact. Keep processing local.
 
-### 3. Complete Offline Execution
-1. In the Network tab, set network throttling to **Offline** (or enable Airplane Mode).
-2. Perform text sanitization, file imports, and file exports.
-3. **Observed Result:** The application operates with 100% feature parity offline.
+GitHub Repository ·
+[Architecture](docs/architecture/ARCHITECTURE.md) ·
+[Demo Guide](docs/hackathon/DEMO.md)
 
----
-
-## ⚠️ Known Limitations
-
-Technical honesty is central to our engineering philosophy. Blackout documents its operational limitations transparently:
-
-- **No Contextual Named Entity Recognition (NER):** Custom person names (e.g. *"Rahul Sharma"*) and street addresses are not flagged, as they require contextual machine learning models.
-- **Compressed IPv6 Unsupported:** Only full 8-group IPv6 formats are currently detected; shorthand notations (`::1`, `fe80::1`) are not matched.
-- **Phone Number Over-Flagging:** High-density 10-digit numeric codes starting with 6–9 may occasionally match the Indian mobile pattern.
-- **Canvas-Based Editors Inaccessible:** Rich text editors that render documents to an HTML5 canvas (e.g. Google Docs) cannot be inspected by DOM tree traversal.
-- **Volatile Extension Undo:** Extension undo snapshots reside strictly in tab RAM and are discarded upon tab closure or navigation.
-
----
-
-## 🗺️ Roadmap
-
-- [ ] **Client-Side WebAssembly NER:** Embed a lightweight, local ONNX/WASM model for zero-network contextual person name and organization recognition.
-- [ ] **Compressed IPv6 Expansion:** Implement RFC 5952 parsing for compressed zero-group IPv6 addresses.
-- [ ] **Custom Regex Manager:** Allow security teams to define custom proprietary regex rules (e.g. internal employee badge formats).
-- [ ] **Document Risk Scoring:** Compute a numerical risk index based on detected entity density and sensitivity weights.
-- [ ] **Cross-Site Rehearsal Matrix:** Expand automated Playwright test journeys across top 100 enterprise CRM and support portals.
-
----
-
-## 🏆 Hackathon Presentation Matrix
-
-| Evaluation Criterion | How Blackout Addresses It |
-| :--- | :--- |
-| **Problem Significance** | Protects organizations against accidental PII leakage in logs, support tickets, and AI prompts without exposing data to third-party cloud redactors. |
-| **Technical Innovation** | Replaces heuristic regexes with formal mathematical algorithms (Luhn and Verhoeff $D_5$), combining disjoint interval resolution with client-side zero-network isolation. |
-| **Engineering Rigor** | 32+ automated tests covering security hardening, XSS escaping, prototype setter updates, stress handling (50,000 lines), and core parity verification. |
-| **Production Readiness** | Dual form factor with a single-file standalone web workspace and an unpackable Manifest V3 Chromium extension. |
-
----
-
-## 📄 License & Author
-
-- **Author:** **Shreyash Bhosale** ([@shreyash-bhosale](https://github.com/shreyash-bhosale)) &bull; `shreyashbhosale592@gmail.com`
-- **Repository:** [https://github.com/shreyash-bhosale/Blackout](https://github.com/shreyash-bhosale/Blackout)
-- **License:** Open-source under the [MIT License](LICENSE).
-- **Challenge:** Built for the **PromptWars × NIAT_Pune Cybersecurity & Data Privacy Hackathon Challenge**.
+Built with JavaScript and a privacy-first engineering mindset.
+</div>
