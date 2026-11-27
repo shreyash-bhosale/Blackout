@@ -1,0 +1,48 @@
+--- BLACKOUT PII SECURITY AUDIT & VERIFICATION SAMPLE ---
+Document Classification: RESTRICTED INTERNAL INCIDENT REPORT
+Generated For: Local Browser PII Sanitization Engine Testing
+Environment: Zero-Network Client-Side Workspace
+
+=== INCIDENT CASE #84920: UNAUTHORIZED TRANSACTION REPORT ===
+
+Primary Customer Information:
+  Full Name: Amit Kumar
+  Primary Email: amit.kumar@cybercorp.in
+  Alternate Email: akumar.personal@securemail.org
+  Contact Number: +91 98765 43210
+  Emergency Mobile: 09123456789
+  Resident Identity (Aadhaar): 2345 6789 0124
+  Income Tax ID (PAN): ABCPE1234F
+  Primary Card (Visa 16-digit): 4111 1111 1111 1111
+  Host Server Gateway: 192.168.1.100
+
+Escalation & Secondary Officer Details:
+  Case Officer: Priya Sharma
+  Departmental Contact: priya.sharma@fintech-shield.org
+  Office Extension Direct: +91-91234-56789
+  Regional Identity (Aadhaar): 3456 7890 1238
+  Tax Identification (PAN): BNZPK9876L
+  Corporate Settlement Card (Mastercard): 5500 0000 0000 0004
+  Subnet Internal Node IP: 10.0.4.254
+
+International Vendor & Infrastructure Audit:
+  Vendor Liaison: Sarah Connor
+  Operations Email: sarah.connor@sky-defense.org
+  International Dispatch: +1 415 555 2671
+  Backup Aadhaar Record: 4567 8901 2341
+  Audit Reference PAN: XYZCA5678B
+  Legacy Card (Visa 13-digit): 4222 2222 2222 2
+  Secondary Card: 4000 1234 5678 9017
+  Primary Cloud Endpoint IPv4: 172.16.254.1
+  Edge Router Gateway IPv6: 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+  Cluster Node IPv6: fe80:0000:0000:0000:0204:61ff:fe9d:f156
+
+=== DECOY & INTEGRITY VERIFICATION (MUST NOT BE DETECTED) ===
+The following entries resemble sensitive formats but MUST be rejected by Blackout algorithms:
+  - Decoy Card (Failed Luhn Check): 4111 1111 1111 1112
+  - Decoy Aadhaar (Failed Verhoeff Check): 2345 6789 0125
+  - Decoy Aadhaar (Starts with 0): 0123 4567 8901
+  - Decoy Aadhaar (Starts with 1): 1234 5678 9012
+  - Internal Order Tracking ID: ORD-987654321098
+  - Firewall Port Forwarding: 8080 -> 443
+  - Incident Timestamp: 2026-11-27 12:45:00 UTC
