@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackout Guard — Extension Test Page</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px 80px;
+      background: #F5F5F7;
+      color: #1D1D1F;
+      line-height: 1.5;
+    }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    p.sub { color: #6E6E73; margin-bottom: 28px; }
+    .form-group {
+      background: #FFFFFF;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.08);
+      margin-bottom: 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+    .hint {
+      font-size: 12px;
+      color: #86868B;
+      margin-bottom: 10px;
+    }
+    input[type="text"], input[type="email"], input[type="password"], textarea, .editable-box {
+      width: 100%;
+      padding: 10px 12px;
+      font-family: monospace;
+      font-size: 13px;
+      border: 1px solid #D2D2D7;
+      border-radius: 8px;
+      box-sizing: border-box;
+      background: #FFFFFF;
+      color: #1D1D1F;
+    }
+    textarea { height: 90px; resize: vertical; }
+    .editable-box {
+      min-height: 80px;
+      outline: none;
+    }
+    .editable-box:focus {
+      border-color: #0071E3;
+    }
+    .protected {
+      border-left: 4px solid #EF4444;
+      background: #FFF5F5;
+    }
+    .controlled-state-readout {
+      margin-top: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #0071E3;
+      padding: 6px 10px;
+      background: #F0F7FF;
+      border-radius: 6px;
+    }
+    iframe {
+      width: 100%;
+      height: 140px;
+      border: 1px solid #D2D2D7;
+      border-radius: 8px;
+      background: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+  <h1>Blackout Guard Test Sandbox</h1>
+  <p class="sub">Local test page containing supported editable fields, React-style controlled inputs, iframes, and strictly protected password/hidden fields.</p>
+
+  <!-- 1. Plain Text Input -->
+  <div class="form-group">
+    <label for="plainInput">1. Standard Text Input</label>
+    <div class="hint">Contains valid Aadhaar: <code>2345 6789 0124</code> and decoy Luhn-failing card: <code>1234 5678 9012 3456</code></div>
+    <input type="text" id="plainInput" value="Citizen ID 2345 6789 0124 and transaction ref 1234 5678 9012 3456">
+  </div>
+
+  <!-- 2. Textarea -->
+  <div class="form-group">
+    <label for="textareaInput">2. Multi-line Textarea</label>
+    <div class="hint">Contains valid Card: <code>4111 1111 1111 1111</code>, PAN: <code>ABCPE1234F</code>, and Decoy IP: <code>999.12.1.5</code></div>
+    <textarea id="textareaInput">Customer settlement card 4111 1111 1111 1111
+Officer PAN ABCPE1234F
+Gateway broadcast 999.12.1.5 (decoy - not PII)</textarea>
+  </div>
+
+  <!-- 3. Email Input -->
+  <div class="form-group">
+    <label for="emailInput">3. Email Input [type="email"]</label>
+    <div class="hint">Contains valid Email: <code>amit.kumar@cybercorp.in</code></div>
+    <input type="email" id="emailInput" value="amit.kumar@cybercorp.in">
+  </div>
+
+  <!-- 4. Strictly Protected Password Input -->
+  <div class="form-group protected">
+    <label for="passwordInput">4. Password Input [type="password"] &mdash; (STRICTLY FORBIDDEN FROM READING OR SCANNING)</label>
+    <div class="hint">Contains fake password and card number. Must remain completely UNTOUCHED by extension:</div>
+    <input type="password" id="passwordInput" value="SecretPass!4111111111111111">
+  </div>
+
+  <!-- 5. Strictly Protected Hidden Input -->
+  <div class="form-group protected">
+    <label>5. Hidden Input [type="hidden"] &mdash; (STRICTLY FORBIDDEN FROM READING OR SCANNING)</label>
+    <div class="hint">Hidden token containing synthetic data. Must remain completely UNTOUCHED:</div>
+    <input type="hidden" id="hiddenInput" value="CSRF_TOKEN_4111111111111111_SECRET">
+    <code style="font-size: 12px; color: #6E6E73;">&lt;input type="hidden" id="hiddenInput" value="..."&gt; (Present in DOM)</code>
+  </div>
+
+  <!-- 6. Contenteditable Div -->
+  <div class="form-group">
+    <label for="contentEditableDiv">6. Contenteditable Div [contenteditable="true"]</label>
+    <div class="hint">Contains valid Indian Phone: <code>+91 98765 43210</code> and valid IPv4: <code>192.168.1.100</code></div>
+    <div class="editable-box" id="contentEditableDiv" contenteditable="true">Emergency dispatch contact +91 98765 43210 assigned to server host 192.168.1.100</div>
+  </div>
+
+  <!-- 7. Same-Origin Iframe -->
+  <div class="form-group">
+    <label>7. Same-Origin Iframe containing Textarea</label>
+    <div class="hint">Iframe document containing an editable field with valid Phone: <code>9876543210</code></div>
+    <iframe id="sameOriginFrame" srcdoc="<!DOCTYPE html><html><body style='margin:10px;font-family:sans-serif;'><label style='font-size:12px;font-weight:600;'>Iframe Internal Textarea:</label><textarea id='frameText' style='width:100%;height:60px;margin-top:4px;'>Internal support line 9876543210</textarea></body></html>"></iframe>
+  </div>
+
+  <!-- 8. React-Style Controlled Input -->
+  <div class="form-group">
+    <label for="controlledInput">8. React-Style Controlled Input Simulator</label>
+    <div class="hint">Demonstrates prototype setter compatibility: maintains internal JS state and re-renders on 'input' event. Contains card: <code>4000 1234 5678 9017</code></div>
+    <input type="text" id="controlledInput" value="Initial: 4000 1234 5678 9017">
+    <div class="controlled-state-readout" id="controlledStateReadout">Internal Component State: "Initial: 4000 1234 5678 9017"</div>
+  </div>
+
+  <script>
+    // React-style Controlled Input Simulator
+    (() => {
+      let internalState = "Initial: 4000 1234 5678 9017";
+      const input = document.getElementById("controlledInput");
+      const readout = document.getElementById("controlledStateReadout");
+
+      input.addEventListener("input", (e) => {
+        // Simulate React controlled component updating state from event and enforcing it back on DOM
+        internalState = e.target.value;
+        readout.textContent = `Internal Component State: "${internalState}"`;
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackout Guard</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">Blackout Guard</span>
+          <span class="brand-tag">Form &amp; Field Privacy</span>
+        </div>
+      </div>
+      <span class="offline-badge" title="100% Client-Side Processing">Offline</span>
+    </header>
+
+    <!-- Privacy Statement -->
+    <div class="privacy-notice" role="note">
+      <svg class="shield-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      </svg>
+      <span>Everything is processed locally in your browser. Nothing leaves your browser.</span>
+    </div>
+
+    <!-- Restricted Page Alert -->
+    <div id="restrictedNotice" class="restricted-notice" style="display: none;">
+      This page does not allow browser extensions to scan its content.
+    </div>
+
+    <!-- Main Content Area -->
+    <main id="mainContent">
+      <!-- Scan Section -->
+      <section class="section scan-section">
+        <button id="scanBtn" class="btn btn-primary btn-full">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          Scan this page
+        </button>
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <span class="metric-label">Fields Scanned</span>
+            <span id="fieldsCount" class="metric-val">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Frames</span>
+            <span id="framesCount" class="metric-val">1</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Oversized Skipped</span>
+            <span id="skippedCount" class="metric-val">0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Findings Section -->
+      <section id="findingsSection" class="section findings-section" style="display: none;">
+        <div class="section-title-row">
+          <span class="section-title">Detection Summary</span>
+          <span id="totalFindingsBadge" class="total-badge">0 findings</span>
+        </div>
+        <div id="categoryBadges" class="category-badges-wrap">
+          <!-- Dynamic category count pills -->
+        </div>
+        <div class="findings-preview-card">
+          <div class="preview-header">Masked Preview</div>
+          <ul id="findingsList" class="findings-list">
+            <!-- Safe masked previews only -->
+          </ul>
+        </div>
+      </section>
+
+      <!-- Redaction Mode Section -->
+      <section id="redactionModeSection" class="section mode-section">
+        <div class="section-title">Redaction Mode</div>
+        <div class="mode-selector" role="radiogroup" aria-label="Redaction mode">
+          <label class="mode-opt active" id="opt-full">
+            <input type="radio" name="wipeMode" value="full" checked>
+            <span>Full Mask</span>
+          </label>
+          <label class="mode-opt" id="opt-partial">
+            <input type="radio" name="wipeMode" value="partial">
+            <span>Partial</span>
+          </label>
+          <label class="mode-opt" id="opt-pseudo">
+            <input type="radio" name="wipeMode" value="pseudo">
+            <span>Pseudo</span>
+          </label>
+          <label class="mode-opt" id="opt-delete">
+            <input type="radio" name="wipeMode" value="delete">
+            <span>Delete</span>
+          </label>
+        </div>
+        <p id="modeDesc" class="mode-desc">Replace findings with [REDACTED].</p>
+      </section>
+
+      <!-- Actions Section -->
+      <section class="section actions-section">
+        <div class="action-buttons-grid">
+          <button id="wipeBtn" class="btn btn-danger" disabled>
+            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+              <line x1="18" y1="9" x2="12" y2="15"></line>
+              <line x1="12" y1="9" x2="18" y2="15"></line>
+            </svg>
+            Wipe all PII on this page
+          </button>
+          <button id="undoBtn" class="btn btn-secondary" disabled>
+            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="1 4 1 10 7 10"></polyline>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+            </svg>
+            Undo
+          </button>
+        </div>
+      </section>
+
+      <!-- Status Bar -->
+      <div id="statusMsg" class="status-bar" role="status" aria-live="polite">
+        Ready. Click "Scan this page" to inspect editable fields.
+      </div>
+
+      <!-- Stretch Feature Container: Guard Mode -->
+      <div id="guardModeSection" class="guard-toggle-row">
+        <div class="guard-info">
+          <span class="guard-title">Guard Mode</span>
+          <span class="guard-sub">Inspect paste events in real time</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="guardToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </main>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

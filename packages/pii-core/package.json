@@ -1,0 +1,21 @@
+{
+  "name": "@blackout/pii-core",
+  "version": "1.0.0",
+  "description": "Zero-dependency, browser-executable PII detection and sanitization engine with mathematical checksum validation",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node ../../tests/core.test.js"
+  },
+  "keywords": [
+    "pii",
+    "privacy",
+    "redaction",
+    "sanitization",
+    "luhn",
+    "verhoeff",
+    "cybersecurity"
+  ],
+  "author": "Shreyash Bhosale",
+  "license": "MIT"
+}
