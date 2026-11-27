@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Blackout Guard",
+  "version": "1.0.0",
+  "description": "Privacy-first browser extension to scan, detect, and redact PII from editable web page fields locally.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Blackout Guard"
+  }
+}

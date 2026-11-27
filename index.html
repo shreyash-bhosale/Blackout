@@ -1,0 +1,2807 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src data:;">
+  <title>Blackout — Privacy-First PII Detection &amp; Sanitization</title>
+  <meta name="description" content="Detect and sanitize supported sensitive information directly in your browser with Blackout. Keep your documents local without uploading content.">
+  <style>
+    :root {
+      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "SF Mono", "Fira Code", Menlo, Monaco, Consolas, monospace;
+      
+      /* Exact Mesh Drift Palette */
+      --c-base: #101010;
+      --c-fg: #F5F5F5;
+      --c-gray-mid: #B0B0B0;
+      --c-gray-deep: #3A3A3A;
+
+      /* Dark Theme Design Tokens (Default) */
+      --bg-base: #101010;
+      --bg-card: rgba(24, 24, 27, 0.72);
+      --bg-surface: rgba(30, 30, 34, 0.82);
+      --bg-sunken: #18181B;
+      --bg-editor: rgba(16, 16, 18, 0.92);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-medium: rgba(255, 255, 255, 0.16);
+      --border-focus: #F5F5F5;
+      --text-main: #F5F5F5;
+      --text-muted: #B0B0B0;
+      --text-sub: #71717A;
+      --accent: #F5F5F5;
+      --accent-contrast: #101010;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+      --shadow-glass: 0 16px 40px rgba(0, 0, 0, 0.65);
+
+      /* Semantic Highlight Tokens (Restrained & High Contrast) */
+      --EMAIL: #3B82F6;
+      --EMAIL-bg: rgba(59, 130, 246, 0.20);
+      --CARD: #F59E0B;
+      --CARD-bg: rgba(245, 158, 11, 0.20);
+      --AADHAAR: #10B981;
+      --AADHAAR-bg: rgba(16, 185, 129, 0.20);
+      --PAN: #8B5CF6;
+      --PAN-bg: rgba(139, 92, 246, 0.20);
+      --IP: #06B6D4;
+      --IP-bg: rgba(6, 182, 212, 0.20);
+      --PHONE: #EC4899;
+      --PHONE-bg: rgba(236, 72, 153, 0.20);
+
+      --status-ok: #10B981;
+      --status-err: #EF4444;
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+    }
+
+    [data-theme="light"] {
+      --bg-base: #F5F5F7;
+      --bg-card: rgba(255, 255, 255, 0.85);
+      --bg-surface: #FFFFFF;
+      --bg-sunken: #EBEBEF;
+      --bg-editor: rgba(255, 255, 255, 0.95);
+      --border-subtle: rgba(0, 0, 0, 0.08);
+      --border-medium: rgba(0, 0, 0, 0.16);
+      --border-focus: #1D1D1F;
+      --text-main: #1D1D1F;
+      --text-muted: #6E6E73;
+      --text-sub: #86868B;
+      --accent: #1D1D1F;
+      --accent-contrast: #FFFFFF;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+      --shadow-glass: 0 16px 40px rgba(0, 0, 0, 0.08);
+
+      --EMAIL-bg: rgba(37, 99, 235, 0.12);
+      --CARD-bg: rgba(217, 119, 6, 0.13);
+      --AADHAAR-bg: rgba(5, 150, 105, 0.13);
+      --PAN-bg: rgba(124, 58, 237, 0.13);
+      --IP-bg: rgba(8, 145, 178, 0.13);
+      --PHONE-bg: rgba(219, 39, 119, 0.13);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-stack);
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    /* WebGL Background Layers */
+    .mesh-drift-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      display: block;
+    }
+
+    .mesh-drift-overlay {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 30%, rgba(16, 16, 16, 0.35) 0%, rgba(16, 16, 16, 0.85) 100%);
+    }
+
+    [data-theme="light"] .mesh-drift-overlay {
+      background: radial-gradient(circle at 50% 30%, rgba(245, 245, 247, 0.45) 0%, rgba(245, 245, 247, 0.90) 100%);
+    }
+
+    /* Application Stacking Context */
+    .app-wrap {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px 24px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Top Sticky Navigation Bar */
+    header.main-nav {
+      position: sticky;
+      top: 16px;
+      z-index: 100;
+      background: var(--bg-card);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #27272A, #101010);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-medium);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    [data-theme="light"] .logo-mark {
+      background: linear-gradient(135deg, #FFFFFF, #EBEBEF);
+    }
+
+    .logo-mark svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: var(--text-main);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .brand-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.15);
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    [data-theme="light"] .nav-links {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .nav-link {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+
+    .nav-link:hover {
+      color: var(--text-main);
+    }
+
+    .nav-link.active {
+      background: var(--accent);
+      color: var(--accent-contrast);
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .privacy-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--status-ok);
+      letter-spacing: 0.02em;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--status-ok);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulseGreen 2s infinite;
+    }
+
+    @keyframes pulseGreen {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      text-decoration: none;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: var(--border-medium);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-contrast);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.92;
+      box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2);
+    }
+
+    [data-theme="light"] .btn-primary:hover:not(:disabled) {
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: var(--status-err);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-icon {
+      padding: 8px;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+    }
+
+    .btn-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+    }
+
+    /* View Sections */
+    .view-section {
+      display: none;
+      flex-direction: column;
+      gap: 24px;
+      animation: fadeInView 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .view-section.active {
+      display: flex;
+    }
+
+    @keyframes fadeInView {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Glass Panels */
+    .glass-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      padding: 32px;
+      box-shadow: var(--shadow-glass);
+      position: relative;
+    }
+
+    /* PAGE 1: LANDING HERO */
+    .hero-wrap {
+      padding: 64px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 28px;
+    }
+
+    .hero-badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.01em;
+    }
+
+    .hero-title {
+      font-size: clamp(38px, 6vw, 68px);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+      max-width: 860px;
+      color: var(--text-main);
+    }
+
+    .hero-subtitle {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--text-muted);
+      max-width: 680px;
+      line-height: 1.55;
+      font-weight: 400;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .hero-cta-btn {
+      padding: 14px 28px;
+      font-size: 15px;
+      border-radius: 999px;
+    }
+
+    .hero-privacy-note {
+      font-size: 12px;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Hero Workspace Preview Mockup */
+    .hero-preview-frame {
+      width: 100%;
+      max-width: 1080px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-medium);
+      background: var(--bg-editor);
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+      margin-top: 16px;
+      text-align: left;
+    }
+
+    .preview-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      background: var(--bg-sunken);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .window-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      divide-x: 1px solid var(--border-subtle);
+      min-height: 220px;
+    }
+
+    .preview-col {
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--text-muted);
+      overflow: hidden;
+    }
+
+    .preview-col-title {
+      font-family: var(--font-stack);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      color: var(--text-sub);
+    }
+
+    /* Landing Section Grid */
+    .section-header {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .section-eyebrow {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-sub);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .section-heading {
+      font-size: clamp(26px, 3.5vw, 38px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .features-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-medium);
+    }
+
+    .feature-icon-wrap {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-main);
+    }
+
+    .feature-icon-wrap svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .feature-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .feature-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    /* Category Badges & Cards */
+    .category-pills-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .cat-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .cat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .cat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .badge-EMAIL { background: var(--EMAIL-bg); color: var(--EMAIL); border: 1px solid rgba(59, 130, 246, 0.35); }
+    .badge-CARD { background: var(--CARD-bg); color: var(--CARD); border: 1px solid rgba(245, 158, 11, 0.35); }
+    .badge-AADHAAR { background: var(--AADHAAR-bg); color: var(--AADHAAR); border: 1px solid rgba(16, 185, 129, 0.35); }
+    .badge-PAN { background: var(--PAN-bg); color: var(--PAN); border: 1px solid rgba(139, 92, 246, 0.35); }
+    .badge-IP { background: var(--IP-bg); color: var(--IP); border: 1px solid rgba(6, 182, 212, 0.35); }
+    .badge-PHONE { background: var(--PHONE-bg); color: var(--PHONE); border: 1px solid rgba(236, 72, 153, 0.35); }
+
+    /* Highlights inside Text */
+    mark {
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: inherit;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    mark.t-EMAIL { background: var(--EMAIL-bg); color: var(--EMAIL); border-color: rgba(59, 130, 246, 0.35); }
+    mark.t-CARD { background: var(--CARD-bg); color: var(--CARD); border-color: rgba(245, 158, 11, 0.35); }
+    mark.t-AADHAAR { background: var(--AADHAAR-bg); color: var(--AADHAAR); border-color: rgba(16, 185, 129, 0.35); }
+    mark.t-PAN { background: var(--PAN-bg); color: var(--PAN); border-color: rgba(139, 92, 246, 0.35); }
+    mark.t-IP { background: var(--IP-bg); color: var(--IP); border-color: rgba(6, 182, 212, 0.35); }
+    mark.t-PHONE { background: var(--PHONE-bg); color: var(--PHONE); border-color: rgba(236, 72, 153, 0.35); }
+
+    /* PAGE 2: PRIVACY WORKSPACE */
+    .workspace-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-bottom: 8px;
+    }
+
+    .workspace-title-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .workspace-page-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .workspace-page-sub {
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Real-Time Detection Summary Bar */
+    .metrics-summary-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px 18px;
+    }
+
+    .chips-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg-sunken);
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .chip-total {
+      font-weight: 600;
+      color: var(--text-main);
+      border-color: var(--border-medium);
+    }
+
+    .char-line-counter {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-family: var(--font-mono);
+    }
+
+    /* Redaction Mode Selector */
+    .mode-selector-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 8px 14px;
+    }
+
+    .mode-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .segmented-control {
+      display: flex;
+      align-items: center;
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 4px;
+    }
+
+    .mode-opt {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+
+    .mode-opt input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .mode-opt.active {
+      background: var(--accent);
+      color: var(--accent-contrast);
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Two-Column Side-by-Side Comparison Workspace */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      min-height: 480px;
+    }
+
+    .pane-card {
+      background: var(--bg-editor);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s ease;
+    }
+
+    .pane-card:focus-within {
+      border-color: var(--border-focus);
+    }
+
+    .pane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px;
+      background: var(--bg-sunken);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .pane-body {
+      flex: 1;
+      position: relative;
+      min-height: 380px;
+      display: flex;
+    }
+
+    .editor-textarea {
+      width: 100%;
+      height: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      padding: 18px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text-main);
+      resize: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .editor-textarea::placeholder {
+      color: var(--text-sub);
+    }
+
+    .diff-display-view {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      padding: 18px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text-main);
+      white-space: pre-wrap;
+      word-break: break-word;
+      user-select: text;
+    }
+
+    /* Bottom Action Controls */
+    .workspace-bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 14px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    .status-msg-box {
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* PAGE 3: DETECTION INSIGHTS */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .kpi-label {
+      font-size: 12px;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .meters-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .meter-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .meter-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+
+    .meter-track {
+      width: 100%;
+      height: 8px;
+      background: var(--bg-sunken);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .meter-bar {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    /* PAGE 4: AUDIT TABLE */
+    .audit-table-wrap {
+      max-height: 480px;
+      overflow-y: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+    }
+
+    table.audit-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    table.audit-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg-sunken);
+      padding: 12px 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 12px;
+      z-index: 2;
+    }
+
+    table.audit-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    table.audit-table tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* PAGE 5: PRIVACY SETTINGS & PROOF */
+    .settings-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      gap: 20px;
+    }
+
+    .setting-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .setting-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .setting-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 600px;
+      line-height: 1.5;
+    }
+
+    .code-box {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--bg-sunken);
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      overflow-x: auto;
+    }
+
+    /* Modal Dialog */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeInView 0.2s ease;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 540px;
+      background: var(--bg-card);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-xl);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-sunken);
+    }
+
+    .modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .install-step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--accent-contrast);
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-content {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .step-title {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .step-desc {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .step-desc code {
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      color: var(--text-main);
+    }
+
+    .modal-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-sunken);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 32px 0 16px;
+      font-size: 12px;
+      color: var(--text-sub);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Mobile Responsiveness */
+    @media (max-width: 900px) {
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+      .nav-links {
+        display: none;
+      }
+      .mobile-menu-btn {
+        display: inline-flex;
+      }
+      .hero-wrap {
+        padding: 40px 16px;
+      }
+      .preview-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .pulse-dot {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Mesh Drift WebGL Signature Background -->
+  <canvas id="meshDriftCanvas" class="mesh-drift-canvas" aria-hidden="true"></canvas>
+  <div class="mesh-drift-overlay" aria-hidden="true"></div>
+
+  <!-- Primary Application Wrapper -->
+  <div class="app-wrap">
+    
+    <!-- Top Sticky Navigation Bar -->
+    <header class="main-nav" role="navigation" aria-label="Main navigation">
+      <div class="brand" id="brandHomeBtn" role="banner" tabindex="0">
+        <div class="logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">Blackout</span>
+          <span class="brand-tag">Privacy Instrument</span>
+        </div>
+      </div>
+
+      <nav class="nav-links" id="desktopNavLinks">
+        <button class="nav-link active" data-view="viewLanding" id="navLanding">Home</button>
+        <button class="nav-link" data-view="viewWorkspace" id="navWorkspace">Workspace</button>
+        <button class="nav-link" data-view="viewInsights" id="navInsights">Insights</button>
+        <button class="nav-link" data-view="viewAudit" id="navAudit">Audit Log</button>
+        <button class="nav-link" data-view="viewSettings" id="navSettings">Settings</button>
+      </nav>
+
+      <div class="nav-actions">
+        <button id="downloadExtNavBtn" class="btn btn-primary" title="Download Blackout Guard Chrome &amp; Edge Extension">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Get Extension
+        </button>
+        <div class="privacy-badge" title="Physical Zero-Network Client-Side Execution">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          <span class="badge-text">Local Processing</span>
+        </div>
+        <button id="themeToggleBtn" class="btn btn-icon" title="Toggle appearance" aria-label="Toggle dark/light appearance">
+          <svg class="theme-icon-dark" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="theme-icon-light" viewBox="0 0 24 24" aria-hidden="true" style="display: none;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <button id="mobileNavToggle" class="btn btn-icon mobile-menu-btn" aria-label="Open navigation menu">
+          <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Hidden File Input for .txt and .csv -->
+    <input type="file" id="fileInput" accept=".txt,.csv" style="display: none;" aria-hidden="true">
+
+    <!-- PAGE 1: LANDING & OVERVIEW VIEW -->
+    <section id="viewLanding" class="view-section active" aria-label="Product overview">
+      <div class="glass-card hero-wrap">
+        <div class="hero-badge-pill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Browser-based processing &bull; Zero document uploads</span>
+        </div>
+        <h1 class="hero-title">Your data. Your control.</h1>
+        <p class="hero-subtitle">
+          Identify sensitive information, sanitize documents, and prepare text for sharing — without uploading your content.
+        </p>
+        <div class="hero-cta-row">
+          <button class="btn btn-primary hero-cta-btn" id="heroOpenWorkspaceBtn">
+            Open Privacy Workspace
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </button>
+          <button class="btn hero-cta-btn" id="heroDownloadExtBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download Extension (.zip)
+          </button>
+          <button class="btn hero-cta-btn" id="heroExploreBtn">
+            Explore How It Works
+          </button>
+        </div>
+
+        <!-- Interactive Hero Workspace Preview -->
+        <div class="hero-preview-frame">
+          <div class="preview-header-bar">
+            <div class="window-dots">
+              <span class="window-dot"></span>
+              <span class="window-dot"></span>
+              <span class="window-dot"></span>
+            </div>
+            <span style="font-size: 11px; font-weight: 500; color: var(--text-muted);">Interactive Detection Preview</span>
+            <span class="badge badge-AADHAAR">Verhoeff Validated</span>
+          </div>
+          <div class="preview-grid">
+            <div class="preview-col">
+              <div class="preview-col-title">Detected Raw Input</div>
+              User: <mark class="t-EMAIL">amit.kumar@cybercorp.in</mark><br>
+              Account Card: <mark class="t-CARD">4111 1111 1111 1111</mark><br>
+              Resident ID: <mark class="t-AADHAAR">2345 6789 0124</mark><br>
+              Host Gateway: <mark class="t-IP">192.168.1.100</mark>
+            </div>
+            <div class="preview-col" style="background: rgba(0, 0, 0, 0.2);">
+              <div class="preview-col-title">Sanitized Output (Partial Mode)</div>
+              User: a***@cybercorp.in<br>
+              Account Card: XXXX XXXX XXXX 1111<br>
+              Resident ID: XXXX XXXX 0124<br>
+              Host Gateway: 192.168.X.X
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- How Blackout Works -->
+      <div class="glass-card" id="howItWorksSection">
+        <div class="section-header">
+          <div class="section-eyebrow">Local Architecture</div>
+          <h2 class="section-heading">How Blackout Works</h2>
+        </div>
+        <div class="features-grid-3" style="margin-top: 24px;">
+          <div class="feature-card">
+            <div class="feature-icon-wrap">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            </div>
+            <h3 class="feature-title">1. Ingest Locally</h3>
+            <p class="feature-desc">Paste unstructured text or import local <code>.txt</code> / <code>.csv</code> files up to 5 MB. Files are read strictly in local RAM via the HTML5 File API.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrap">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+            <h3 class="feature-title">2. Detect &amp; Validate</h3>
+            <p class="feature-desc">Our prioritized engine parses text against 8 detector rules. Numbers are validated with Luhn and Verhoeff dihedral checksums to discard decoys.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrap">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </div>
+            <h3 class="feature-title">3. Sanitize &amp; Export</h3>
+            <p class="feature-desc">Switch between Full Mask, Partial Mask, or Pseudonymization. Compare diffs and export in one click using client-side in-memory Blobs.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supported Categories -->
+      <div class="glass-card">
+        <div class="section-header">
+          <div class="section-eyebrow">Deterministic Recognition</div>
+          <h2 class="section-heading">Supported PII Categories</h2>
+        </div>
+        <div class="cat-card-grid" style="margin-top: 24px;">
+          <div class="cat-card">
+            <div class="cat-header"><span class="badge badge-EMAIL">EMAIL</span></div>
+            <div class="feature-title">Email Addresses</div>
+            <p class="feature-desc">RFC local parts, <code>@</code> symbol, valid domain names, and TLDs of 2+ letters with word boundaries.</p>
+          </div>
+          <div class="cat-card">
+            <div class="cat-header"><span class="badge badge-CARD">CARD</span></div>
+            <div class="feature-title">Payment Cards</div>
+            <p class="feature-desc">13–19 digits validated with the <strong>Luhn Checksum</strong> algorithm. Repeated decoy strings are rejected.</p>
+          </div>
+          <div class="cat-card">
+            <div class="cat-header"><span class="badge badge-AADHAAR">AADHAAR</span></div>
+            <div class="feature-title">Aadhaar Identifiers</div>
+            <p class="feature-desc">12 digits starting 2–9 validated via <strong>Verhoeff dihedral group $D_5$</strong> permutation tables.</p>
+          </div>
+          <div class="cat-card">
+            <div class="cat-header"><span class="badge badge-PAN">PAN</span></div>
+            <div class="feature-title">Indian Tax PAN</div>
+            <p class="feature-desc"><code>[A-Z]{5}[0-9]{4}[A-Z]</code> validated against official 4th-character tax entity holder codes (P, C, H, F, A, T, etc.).</p>
+          </div>
+          <div class="cat-card">
+            <div class="cat-header"><span class="badge badge-IP">IP</span></div>
+            <div class="feature-title">IP Addresses</div>
+            <p class="feature-desc">Dotted-quad IPv4 addresses with 0–255 octet bounds and full eight-group colon-separated IPv6 addresses.</p>
+          </div>
+          <div class="cat-card">
+            <div class="cat-header"><span class="badge badge-PHONE">PHONE</span></div>
+            <div class="feature-title">Phone Numbers</div>
+            <p class="feature-desc">10-digit Indian mobiles starting 6–9 with <code>+91/0091/0</code> prefixes, and international E.164 phone numbers.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Responsible Use Disclaimer Card -->
+      <div class="glass-card" style="border-left: 4px solid var(--border-medium);">
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">Limitations &amp; Responsible Use</h3>
+        <p class="feature-desc">
+          Blackout detects structured patterns using regex and mathematical checksums. Unstructured contextual entities (such as person names or street addresses) require NLP/NER models and are out of scope. Pattern-based redaction reduces data exposure risks; it does not constitute a legal guarantee of full data anonymization.
+        </p>
+      </div>
+
+      <!-- Blackout Guard Browser Extension Showcase Card -->
+      <div class="glass-card" style="border-left: 4px solid var(--accent); margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+          <div style="max-width: 760px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--status-ok);">Manifest V3 Extension</span>
+              <span style="font-size: 12px; color: var(--text-muted); font-weight: 500;">Google Chrome &bull; Microsoft Edge &bull; Chromium</span>
+            </div>
+            <h3 style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px;">Blackout Guard &mdash; Form &amp; Field Privacy Extension</h3>
+            <p class="feature-desc">
+              Scan, highlight, and redact sensitive PII directly inside live web forms, support portals, and textareas. Features real-time Guard Mode paste interception and one-click in-memory undo without ever touching password or hidden fields.
+            </p>
+          </div>
+          <button id="showcaseDownloadExtBtn" class="btn btn-primary" style="padding: 12px 24px; font-size: 14px; border-radius: 999px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download Extension (.zip)
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 2: PRIVACY WORKSPACE VIEW -->
+    <section id="viewWorkspace" class="view-section" aria-label="Sanitization workspace">
+      
+      <!-- Workspace Header -->
+      <div class="workspace-top-bar">
+        <div class="workspace-title-box">
+          <h2 class="workspace-page-title">Privacy Workspace</h2>
+          <span class="workspace-page-sub">Review, detect, and sanitize sensitive information locally.</span>
+        </div>
+        <div class="toolbar-actions">
+          <button id="sampleBtn" class="btn btn-primary" title="Load synthetic testing sample">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+            Load Noisy Sample
+          </button>
+          <button id="fileTxtBtn" class="btn" title="Open .txt file">Import .txt</button>
+          <button id="fileCsvBtn" class="btn" title="Open .csv file">Import .csv</button>
+          <button id="clearBtn" class="btn btn-danger" title="Clear input text">Clear</button>
+        </div>
+      </div>
+
+      <!-- Real-Time Metrics Summary Bar -->
+      <div class="metrics-summary-bar">
+        <div class="chips-group" id="chips">
+          <span class="chip chip-total">Total Findings: <span class="chip-count">0</span></span>
+          <span class="chip">Unique Values: <span class="chip-count">0</span></span>
+        </div>
+        <div class="char-line-counter" id="charCount">0 characters &bull; 0 lines</div>
+      </div>
+
+      <!-- Redaction Mode Selector Bar -->
+      <div class="mode-selector-wrap">
+        <span class="mode-label">Redaction Mode</span>
+        <div class="segmented-control" role="radiogroup" aria-label="Redaction mode selection">
+          <label class="mode-opt active" id="opt-full">
+            <input type="radio" name="mode" value="full" checked>
+            <span>Full Redaction</span>
+          </label>
+          <label class="mode-opt" id="opt-partial">
+            <input type="radio" name="mode" value="partial">
+            <span>Partial Mask</span>
+          </label>
+          <label class="mode-opt" id="opt-pseudo">
+            <input type="radio" name="mode" value="pseudo">
+            <span>Pseudonymize</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Side-by-Side Dual-Pane Comparison Grid -->
+      <div class="comparison-grid">
+        <!-- Original Input / Highlighted Pane -->
+        <div class="pane-card">
+          <div class="pane-header">
+            <span>Original Input</span>
+            <span id="leftCount" style="font-weight: 500; color: var(--text-muted);">0 detections</span>
+          </div>
+          <div class="pane-body">
+            <textarea id="in" class="editor-textarea" placeholder="Paste or type sensitive text here, or click 'Load Noisy Sample'..." spellcheck="false" aria-label="Sensitive text input"></textarea>
+            <div id="left" class="diff-display-view" style="display: none;" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <!-- Sanitized Output Pane -->
+        <div class="pane-card">
+          <div class="pane-header">
+            <span>Sanitized Output</span>
+            <span id="rightMode" style="font-weight: 500; color: var(--text-muted);">Mode: FULL</span>
+          </div>
+          <div class="pane-body">
+            <div id="right" class="diff-display-view" tabindex="0" aria-label="Sanitized output preview" role="region"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Actions Bar -->
+      <div class="workspace-bottom-bar">
+        <div id="statusMsg" class="status-msg-box" role="status" aria-live="polite">
+          Ready. Paste text or click "Load Noisy Sample".
+        </div>
+        <div class="toolbar-actions">
+          <button id="copyBtn" class="btn" disabled title="Copy sanitized text to clipboard">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Copy Sanitized
+          </button>
+          <button id="dlBtn" class="btn btn-primary" disabled title="Download sanitized file as .txt">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download .txt
+          </button>
+          <button id="dlCsvBtn" class="btn" disabled style="display: none;" title="Download sanitized CSV file">
+            Download .csv
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 3: DETECTION INSIGHTS VIEW -->
+    <section id="viewInsights" class="view-section" aria-label="Detection insights">
+      <div class="workspace-top-bar">
+        <div class="workspace-title-box">
+          <h2 class="workspace-page-title">Detection Insights</h2>
+          <span class="workspace-page-sub">Mathematical classification and structural analysis of detected entities.</span>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Findings</span>
+          <span class="kpi-value" id="kpiTotal">0</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Unique Entities</span>
+          <span class="kpi-value" id="kpiUnique">0</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Financial Identifiers</span>
+          <span class="kpi-value" id="kpiFinancial">0</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Network Identifiers</span>
+          <span class="kpi-value" id="kpiNetwork">0</span>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Category Distribution</h3>
+        <div class="meters-wrap" id="metersList">
+          <div class="meter-row">
+            <div class="meter-header"><span>EMAIL</span><span>0 (0%)</span></div>
+            <div class="meter-track"><div class="meter-bar" style="width: 0%; background: var(--EMAIL);"></div></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-header"><span>CARD</span><span>0 (0%)</span></div>
+            <div class="meter-track"><div class="meter-bar" style="width: 0%; background: var(--CARD);"></div></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-header"><span>AADHAAR</span><span>0 (0%)</span></div>
+            <div class="meter-track"><div class="meter-bar" style="width: 0%; background: var(--AADHAAR);"></div></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-header"><span>PAN</span><span>0 (0%)</span></div>
+            <div class="meter-track"><div class="meter-bar" style="width: 0%; background: var(--PAN);"></div></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-header"><span>IP</span><span>0 (0%)</span></div>
+            <div class="meter-track"><div class="meter-bar" style="width: 0%; background: var(--IP);"></div></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-header"><span>PHONE</span><span>0 (0%)</span></div>
+            <div class="meter-track"><div class="meter-bar" style="width: 0%; background: var(--PHONE);"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 4: AUDIT LOG VIEW -->
+    <section id="viewAudit" class="view-section" aria-label="Audit findings log">
+      <div class="workspace-top-bar">
+        <div class="workspace-title-box">
+          <h2 class="workspace-page-title">Audit Inspection Table</h2>
+          <span class="workspace-page-sub">Chronological register of detected findings with physical line anchors (First 500 rows).</span>
+        </div>
+        <div class="toolbar-actions" id="auditFilters">
+          <button class="btn btn-primary" data-filter="ALL">All Categories</button>
+          <button class="btn" data-filter="EMAIL">Email</button>
+          <button class="btn" data-filter="CARD">Cards</button>
+          <button class="btn" data-filter="AADHAAR">Aadhaar</button>
+          <button class="btn" data-filter="PAN">PAN</button>
+          <button class="btn" data-filter="IP">IP</button>
+          <button class="btn" data-filter="PHONE">Phone</button>
+        </div>
+      </div>
+
+      <div class="audit-table-wrap">
+        <table id="audit" class="audit-table" aria-label="Audit findings table">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 60px;">#</th>
+              <th scope="col" style="width: 120px;">Category</th>
+              <th scope="col" style="width: 80px;">Line</th>
+              <th scope="col">Original Value</th>
+              <th scope="col">Sanitized Replacement</th>
+            </tr>
+          </thead>
+          <tbody id="auditBody">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-sub); padding: 32px;">No findings to display. Enter text or load a sample.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="auditNote" style="font-size: 12px; color: var(--text-sub);">Showing all findings.</div>
+    </section>
+
+    <!-- PAGE 5: PRIVACY SETTINGS VIEW -->
+    <section id="viewSettings" class="view-section" aria-label="Settings and privacy">
+      <div class="workspace-top-bar">
+        <div class="workspace-title-box">
+          <h2 class="workspace-page-title">Settings &amp; Technical Privacy</h2>
+          <span class="workspace-page-sub">Review active browser security boundaries and session memory controls.</span>
+        </div>
+      </div>
+
+      <div class="settings-list">
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Wipe Session Memory</span>
+            <span class="setting-desc">Instantly purge all in-memory text, parsed tokens, pseudonym tables, and audit logs from volatile browser heap memory.</span>
+          </div>
+          <button id="wipeMemoryBtn" class="btn btn-danger">Wipe Session Memory</button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Content Security Policy Enforced</span>
+            <span class="setting-desc">The browser kernel unconditionally blocks all outgoing network calls, telemetry, and external script loading.</span>
+            <div class="code-box" style="margin-top: 10px;">
+              default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src data:;
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Zero Persistent Storage Policy</span>
+            <span class="setting-desc">Blackout never uses <code>localStorage</code>, <code>sessionStorage</code>, <code>IndexedDB</code>, or cookies. All processing is 100% ephemeral in tab RAM.</span>
+          </div>
+          <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--status-ok);">Strictly Enforced</span>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Blackout Guard Browser Extension (Manifest V3)</span>
+            <span class="setting-desc">Download the packaged browser extension (.zip) for Chrome, Edge, and Brave to redact sensitive fields directly inside web forms, CRMs, and support portals.</span>
+          </div>
+          <button id="settingsDownloadExtBtn" class="btn btn-primary">Download Extension (.zip)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Extension Installation Modal -->
+    <div id="extModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="extModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="logo-mark" aria-hidden="true" style="width: 28px; height: 28px;">
+              <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <div>
+              <h3 id="extModalTitle" style="font-size: 15px; font-weight: 700;">Install Blackout Guard</h3>
+              <span style="font-size: 11px; color: var(--text-muted);">Manifest V3 for Chrome, Edge, and Brave</span>
+            </div>
+          </div>
+          <button id="closeExtModalBtn" class="btn btn-icon" aria-label="Close dialog">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="install-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <span class="step-title">Extract the ZIP Archive</span>
+              <span class="step-desc">Your browser downloaded <code>blackout-guard-extension.zip</code>. Unzip/extract this file to an easy-to-find folder.</span>
+            </div>
+          </div>
+          <div class="install-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <span class="step-title">Open Browser Extensions</span>
+              <span class="step-desc">In Chrome, go to <code>chrome://extensions</code> (or <code>edge://extensions</code> in Edge). Toggle ON <strong>Developer mode</strong> in the top-right corner.</span>
+            </div>
+          </div>
+          <div class="install-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <span class="step-title">Click "Load unpacked"</span>
+              <span class="step-desc">Select the extracted <code>extension</code> folder. Blackout Guard will immediately appear in your browser toolbar ready to scan and protect forms!</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <a href="blackout-guard-extension.zip" download="blackout-guard-extension.zip" class="btn btn-primary" id="directDownloadZipBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Re-download ZIP
+          </a>
+          <button id="doneExtModalBtn" class="btn">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Application Footer -->
+    <footer>
+      <span>Blackout &bull; Privacy-First PII Detection &amp; Sanitization Instrument</span>
+      <span>100% Client-Side Processing &bull; Zero Network Transmission</span>
+    </footer>
+
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT -->
+  <script>
+// CORE START
+const VD = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+];
+
+const VP = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
+];
+
+const O = "(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)";
+
+function verhoeff(s) {
+  const d = s.replace(/\D/g, "");
+  if (d.length !== 12 || d[0] < "2" || d[0] > "9") return false;
+  let c = 0;
+  const rev = d.split("").reverse().map(Number);
+  for (let i = 0; i < rev.length; i++) {
+    c = VD[c][VP[i % 8][rev[i]]];
+  }
+  return c === 0;
+}
+
+function luhn(s) {
+  const d = s.replace(/\D/g, "");
+  if (d.length < 13 || d.length > 19) return false;
+  if (/^(\d)\1+$/.test(d)) return false;
+  let sum = 0;
+  let double = false;
+  for (let i = d.length - 1; i >= 0; i--) {
+    let digit = parseInt(d[i], 10);
+    if (double) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    double = !double;
+  }
+  return sum % 10 === 0;
+}
+
+const DETECTORS = [
+  {
+    type: "EMAIL",
+    re: /(?<![a-zA-Z0-9._%+-])[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?![a-zA-Z0-9._%+-])/g
+  },
+  {
+    type: "CARD",
+    re: /(?<!\d[ -]?)(?:\d[ -]?){12,18}\d(?![ -]?\d)/g,
+    ok: luhn
+  },
+  {
+    type: "AADHAAR",
+    re: /(?<!\d[ -]?)[2-9]\d{3}[ -]?\d{4}[ -]?\d{4}(?![ -]?\d)/g,
+    ok: verhoeff
+  },
+  {
+    type: "PAN",
+    re: /\b[A-Z]{5}\d{4}[A-Z]\b/g,
+    ok: function(s) { return "PCHFATBLJG".indexOf(s[3]) !== -1; }
+  },
+  {
+    type: "IP",
+    re: new RegExp("(?<![\\d.])(?:" + O + "\\.){3}" + O + "(?!\\.?\\d)", "g")
+  },
+  {
+    type: "IP",
+    re: /(?<![0-9a-fA-F:])(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}(?![0-9a-fA-F:])/gi
+  },
+  {
+    type: "PHONE",
+    re: /(?<!\d[ -]?)(?:(?:\+91|0091|0)[ -]?)?[6-9]\d{4}[ -]?\d{5}(?![ -]?\d)/g
+  },
+  {
+    type: "PHONE",
+    re: /(?<![\w+])\+(?!91[ -]?\d)\d{1,4}(?:[ -]?\d{2,5}){2,4}(?![ -]?\d)/g
+  }
+];
+
+function detect(text) {
+  if (!text || typeof text !== "string") return [];
+  const candidates = [];
+  for (let pri = 0; pri < DETECTORS.length; pri++) {
+    const d = DETECTORS[pri];
+    const regex = new RegExp(d.re.source, d.re.flags);
+    let m;
+    while ((m = regex.exec(text)) !== null) {
+      const val = m[0];
+      if (d.ok && !d.ok(val)) continue;
+      candidates.push({
+        type: d.type,
+        start: m.index,
+        end: m.index + val.length,
+        value: val,
+        pri: pri
+      });
+      if (regex.lastIndex === m.index) regex.lastIndex++;
+    }
+  }
+
+  candidates.sort(function(a, b) {
+    if (a.pri !== b.pri) return a.pri - b.pri;
+    return (b.end - b.start) - (a.end - a.start);
+  });
+
+  const used = new Uint8Array(text.length);
+  const accepted = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    let overlap = false;
+    for (let k = c.start; k < c.end; k++) {
+      if (used[k]) {
+        overlap = true;
+        break;
+      }
+    }
+    if (!overlap) {
+      for (let k = c.start; k < c.end; k++) used[k] = 1;
+      accepted.push(c);
+    }
+  }
+
+  accepted.sort(function(a, b) {
+    return a.start - b.start;
+  });
+  return accepted;
+}
+
+function maskKeep(s, n, re) {
+  const chars = s.split("");
+  const matchIdxs = [];
+  const r = new RegExp(re.source);
+  for (let i = 0; i < chars.length; i++) {
+    if (r.test(chars[i])) matchIdxs.push(i);
+  }
+  const keepSet = new Set(matchIdxs.slice(-n));
+  for (let i = 0; i < matchIdxs.length; i++) {
+    const idx = matchIdxs[i];
+    if (!keepSet.has(idx)) chars[idx] = "X";
+  }
+  return chars.join("");
+}
+
+function partial(f) {
+  if (!f || !f.value) return "[REDACTED]";
+  if (f.type === "CARD" || f.type === "AADHAAR" || f.type === "PHONE") {
+    return maskKeep(f.value, 4, /\d/);
+  }
+  if (f.type === "PAN") {
+    return f.value.slice(0, -4).replace(/./g, "X") + f.value.slice(-4);
+  }
+  if (f.type === "EMAIL") {
+    const at = f.value.indexOf("@");
+    if (at <= 0) return "[REDACTED]";
+    return f.value[0] + "***" + f.value.slice(at);
+  }
+  if (f.type === "IP") {
+    if (f.value.indexOf(".") !== -1) {
+      const p = f.value.split(".");
+      return p[0] + "." + p[1] + ".X.X";
+    }
+    const p = f.value.split(":");
+    return p[0] + ":XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX";
+  }
+  return "[REDACTED]";
+}
+
+function norm(f) {
+  if (!f || !f.value) return "";
+  if (f.type === "EMAIL") return f.value.toLowerCase();
+  if (f.type === "PAN" || f.type === "IP") return f.value.toUpperCase();
+  let d = f.value.replace(/\D/g, "");
+  if (/^0091\d{10}$/.test(d)) d = d.slice(4);
+  else if (/^(?:91|00)\d{10}$/.test(d)) d = d.slice(2);
+  else if (/^0\d{10}$/.test(d)) d = d.slice(1);
+  return d;
+}
+
+function sanitize(text, findings, mode) {
+  if (!text || typeof text !== "string") return { text: "", reps: [] };
+  if (!findings || !Array.isArray(findings) || findings.length === 0) {
+    return { text: text, reps: [] };
+  }
+  const map = new Map();
+  const cnt = {};
+  const reps = [];
+  let out = "";
+  let lastIdx = 0;
+
+  for (let i = 0; i < findings.length; i++) {
+    const f = findings[i];
+    out += text.slice(lastIdx, f.start);
+    let rep = "";
+    if (mode === "full") {
+      rep = "[REDACTED]";
+    } else if (mode === "partial") {
+      rep = partial(f);
+    } else if (mode === "pseudo") {
+      const key = f.type + "|" + norm(f);
+      if (map.has(key)) {
+        rep = map.get(key);
+      } else {
+        cnt[f.type] = (cnt[f.type] || 0) + 1;
+        const numStr = String(cnt[f.type]).padStart(2, "0");
+        rep = f.type + "_" + numStr;
+        map.set(key, rep);
+      }
+    } else {
+      rep = "[REDACTED]";
+    }
+    reps.push(rep);
+    out += rep;
+    lastIdx = f.end;
+  }
+  out += text.slice(lastIdx);
+  return { text: out, reps: reps };
+}
+// CORE END
+
+// --- UI IMPLEMENTATION ---
+function esc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function lineStarts(t) {
+  const p = [0];
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === "\n") p.push(i + 1);
+  }
+  return p;
+}
+
+function lineOf(starts, pos) {
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (starts[mid] <= pos) {
+      if (mid === starts.length - 1 || starts[mid + 1] > pos) {
+        return mid + 1;
+      }
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return 1;
+}
+
+function view(text, findings, reps, isRight) {
+  let h = "";
+  let last = 0;
+  for (let i = 0; i < findings.length; i++) {
+    const f = findings[i];
+    h += esc(text.slice(last, f.start));
+    if (isRight) {
+      h += '<mark class="t-' + f.type + '">' + esc(reps[i]) + '</mark>';
+    } else {
+      h += '<mark class="t-' + f.type + '">' + esc(f.value) + '</mark>';
+    }
+    last = f.end;
+  }
+  h += esc(text.slice(last));
+  return h;
+}
+
+// -------------------------------------------------------------
+// SIGNATURE MESH DRIFT WEBGL SHADER ENGINE
+// -------------------------------------------------------------
+(function initMeshDrift() {
+  const canvas = document.getElementById("meshDriftCanvas");
+  if (!canvas) return;
+
+  const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+  if (!gl) {
+    canvas.style.display = "none";
+    return;
+  }
+
+  const vsSource = `
+    attribute vec2 position;
+    void main() {
+      gl_Position = vec4(position, 0.0, 1.0);
+    }
+  `;
+
+  // Exact 4-Color Mesh Drift Blobs Fragment Shader
+  const fsSource = `
+    precision highp float;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    uniform vec3 u_color1; // #101010
+    uniform vec3 u_color2; // #F5F5F5
+    uniform vec3 u_color3; // #B0B0B0
+    uniform vec3 u_color4; // #3A3A3A
+    uniform float u_speed;
+    uniform float u_zoom;
+    uniform float u_intensity;
+    uniform float u_warp;
+    uniform float u_contrast;
+    uniform float u_brightness;
+    uniform float u_saturation;
+    uniform float u_vignette;
+    uniform float u_grain;
+
+    vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+    vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+
+    float snoise(vec3 v){
+      const vec2  C = vec2(1.0/6.0, 1.0/3.0);
+      const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+
+      vec3 i  = floor(v + dot(v, C.yyy));
+      vec3 x0 =   v - i + dot(i, C.xxx);
+
+      vec3 g = step(x0.yzx, x0.xyz);
+      vec3 l = 1.0 - g;
+      vec3 i1 = min(g.xyz, l.zxy);
+      vec3 i2 = max(g.xyz, l.zxy);
+
+      vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+      vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+      vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+
+      i = mod(i, 289.0);
+      vec4 p = permute(permute(permute(
+                 i.z + vec4(0.0, i1.z, i2.z, 1.0))
+               + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+               + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+      float n_ = 0.142857142857;
+      vec3  ns = n_ * D.wyz - D.xzx;
+
+      vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+      vec4 x_ = floor(j * ns.z);
+      vec4 y_ = floor(j - 7.0 * x_);
+
+      vec4 x = x_ * ns.x + ns.yyyy;
+      vec4 y = y_ * ns.x + ns.yyyy;
+      vec4 h = 1.0 - abs(x) - abs(y);
+
+      vec4 b0 = vec4(x.xy, y.xy);
+      vec4 b1 = vec4(x.zw, y.zw);
+
+      vec4 s0 = floor(b0) * 2.0 + 1.0;
+      vec4 s1 = floor(b1) * 2.0 + 1.0;
+      vec4 sh = -step(h, vec4(0.0));
+
+      vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+      vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+      vec3 p0 = vec3(a0.xy, h.x);
+      vec3 p1 = vec3(a0.zw, h.y);
+      vec3 p2 = vec3(a1.xy, h.z);
+      vec3 p3 = vec3(a1.zw, h.w);
+
+      vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+      p0 *= norm.x;
+      p1 *= norm.y;
+      p2 *= norm.z;
+      p3 *= norm.w;
+
+      vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+      m = m * m;
+      return 42.0 * dot(m * m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+    }
+
+    void main() {
+      vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+      vec2 p = (gl_FragCoord.xy * 2.0 - u_resolution.xy) / min(u_resolution.x, u_resolution.y);
+
+      float t = u_time * u_speed * 0.15;
+      vec2 st = p * (0.8 + u_zoom * 1.5);
+
+      if (u_warp > 0.001) {
+        float q = snoise(vec3(st + vec2(t * 0.2, t * 0.3), t));
+        float r = snoise(vec3(st + vec2(q, -q) + vec2(1.7, 9.2), t));
+        st += u_warp * vec2(q, r);
+      }
+
+      float n1 = snoise(vec3(st * 1.0, t * 0.5));
+      float n2 = snoise(vec3(st * 2.1 + vec2(100.0, -50.0), t * 0.7));
+      float n3 = snoise(vec3(st * 4.2 + vec2(-30.0, 80.0), t * 1.1));
+
+      float val = n1 * 0.55 + n2 * 0.30 + n3 * 0.15;
+      val = val * (0.6 + u_intensity * 0.8);
+      val = clamp((val + 0.5), 0.0, 1.0);
+
+      vec3 col;
+      if (val < 0.33) {
+        float f = smoothstep(0.0, 0.33, val);
+        col = mix(u_color1, u_color4, f);
+      } else if (val < 0.66) {
+        float f = smoothstep(0.33, 0.66, val);
+        col = mix(u_color4, u_color3, f);
+      } else {
+        float f = smoothstep(0.66, 1.0, val);
+        col = mix(u_color3, u_color2, f);
+      }
+
+      col = (col - 0.5) * (1.0 + (u_contrast - 0.5) * 1.5) + 0.5;
+      col += (u_brightness - 0.5) * 0.35;
+
+      float gray = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(vec3(gray), col, u_saturation * 2.0);
+
+      if (u_vignette > 0.001) {
+        float d = length(uv - 0.5);
+        col *= 1.0 - smoothstep(0.3, 0.8, d) * u_vignette;
+      }
+
+      if (u_grain > 0.001) {
+        float noise = fract(sin(dot(gl_FragCoord.xy + fract(u_time * 10.0), vec2(12.9898, 78.233))) * 43758.5453);
+        col += (noise - 0.5) * (u_grain * 0.22);
+      }
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `;
+
+  function compileShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      gl.deleteShader(s);
+      return null;
+    }
+    return s;
+  }
+
+  const vs = compileShader(gl.VERTEX_SHADER, vsSource);
+  const fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+  if (!vs || !fs) return;
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+  gl.useProgram(prog);
+
+  const triBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, triBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+  const posAttr = gl.getAttribLocation(prog, "position");
+  gl.enableVertexAttribArray(posAttr);
+  gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
+
+  const uRes = gl.getUniformLocation(prog, "u_resolution");
+  const uTime = gl.getUniformLocation(prog, "u_time");
+  const uCol1 = gl.getUniformLocation(prog, "u_color1");
+  const uCol2 = gl.getUniformLocation(prog, "u_color2");
+  const uCol3 = gl.getUniformLocation(prog, "u_color3");
+  const uCol4 = gl.getUniformLocation(prog, "u_color4");
+  const uSpeed = gl.getUniformLocation(prog, "u_speed");
+  const uZoom = gl.getUniformLocation(prog, "u_zoom");
+  const uIntensity = gl.getUniformLocation(prog, "u_intensity");
+  const uWarp = gl.getUniformLocation(prog, "u_warp");
+  const uContrast = gl.getUniformLocation(prog, "u_contrast");
+  const uBrightness = gl.getUniformLocation(prog, "u_brightness");
+  const uSaturation = gl.getUniformLocation(prog, "u_saturation");
+  const uVignette = gl.getUniformLocation(prog, "u_vignette");
+  const uGrain = gl.getUniformLocation(prog, "u_grain");
+
+  // Uniform Setters: Exact Parameters
+  gl.uniform3f(uCol1, 16/255, 16/255, 16/255);       // #101010
+  gl.uniform3f(uCol2, 245/255, 245/255, 245/255);   // #F5F5F5
+  gl.uniform3f(uCol3, 176/255, 176/255, 176/255);   // #B0B0B0
+  gl.uniform3f(uCol4, 58/255, 58/255, 58/255);       // #3A3A3A
+  gl.uniform1f(uSpeed, 0.33);
+  gl.uniform1f(uZoom, 0.33);
+  gl.uniform1f(uIntensity, 0.34);
+  gl.uniform1f(uWarp, 0.0);
+  gl.uniform1f(uContrast, 0.62);
+  gl.uniform1f(uBrightness, 0.50);
+  gl.uniform1f(uSaturation, 0.50);
+  gl.uniform1f(uVignette, 0.0);
+  gl.uniform1f(uGrain, 0.26);
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.floor(window.innerWidth * dpr);
+    const h = Math.floor(window.innerHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+      gl.viewport(0, 0, w, h);
+      gl.uniform2f(uRes, w, h);
+    }
+  }
+
+  window.addEventListener("resize", resize, { passive: true });
+  resize();
+
+  let rafId = null;
+  let startTime = performance.now();
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function render(now) {
+    if (document.hidden) return;
+    const elapsed = (now - startTime) * 0.001;
+    gl.uniform1f(uTime, elapsed);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (!prefersReduced) {
+      rafId = requestAnimationFrame(render);
+    }
+  }
+
+  // Initial draw
+  render(performance.now());
+
+  document.addEventListener("visibilitychange", function() {
+    if (document.hidden) {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+    } else if (!prefersReduced) {
+      rafId = requestAnimationFrame(render);
+    }
+  });
+})();
+
+// -------------------------------------------------------------
+// APP STATE & WORKSPACE ORCHESTRATION
+// -------------------------------------------------------------
+const inEl = document.getElementById("in");
+const leftEl = document.getElementById("left");
+const rightEl = document.getElementById("right");
+const leftCountEl = document.getElementById("leftCount");
+const rightModeEl = document.getElementById("rightMode");
+const chipsEl = document.getElementById("chips");
+const statusMsgEl = document.getElementById("statusMsg");
+const charCountEl = document.getElementById("charCount");
+const dlBtn = document.getElementById("dlBtn");
+const dlCsvBtn = document.getElementById("dlCsvBtn");
+const copyBtn = document.getElementById("copyBtn");
+const sampleBtn = document.getElementById("sampleBtn");
+const clearBtn = document.getElementById("clearBtn");
+const fileInput = document.getElementById("fileInput");
+const fileTxtBtn = document.getElementById("fileTxtBtn");
+const fileCsvBtn = document.getElementById("fileCsvBtn");
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+const wipeMemoryBtn = document.getElementById("wipeMemoryBtn");
+const auditBodyEl = document.getElementById("auditBody");
+const auditNoteEl = document.getElementById("auditNote");
+
+let mode = "full";
+let current = "";
+let cachedFindings = [];
+let cachedReps = [];
+let originalFileName = "";
+let isCsvFile = false;
+let activeAuditFilter = "ALL";
+let timer = null;
+
+const SAMPLE_TEXT = `--- BLACKOUT PRIVACY SANITIZATION COMPREHENSIVE SAMPLE ---
+Audit Session ID: QA-2026-X992 (Synthetic Data Only)
+
+Customer Support Incident #49021:
+Customer Email: amit.kumar@cybercorp.in has reported an unauthorized charge.
+Alternative Contact Email: Support_Team@CyberCorp.IN (Case escalation lead).
+Direct Line: +91 98765 43210
+Customer Emergency Contact: 9876543210 (Duplicate mobile record).
+Regional Field Officer International: +1 415 555 2671
+Customer Settlement Primary Card: 4111 1111 1111 1111
+Resident Identity Aadhaar: 2345 6789 0124
+Tax Identification PAN: ABCPE1234F
+Internal Server Gateway: 192.168.1.100
+External Data Relay IPv6: 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+
+Secondary Identity Verification Records:
+Additional Cardholder Visa: 4222 2222 2222 2
+Additional Resident Aadhaar: 3456 7890 1238
+Company Representative PAN: XYZCA5678B
+Backup Routing Gateway IPv4: 10.0.0.1
+Secondary IPv6 Node: fe80:0000:0000:0000:0204:61ff:fe9d:f156
+Escalation Officer Mobile: 09123456789
+
+Decoy & Edge Case Records (Must NOT be flagged as PII):
+Invalid Card (Luhn check failure): 4111 1111 1111 1112
+Invalid Aadhaar (Verhoeff check failure): 2345 6789 0125
+Invalid PAN (Invalid 4th character status code 'X'): ABCXE1234F
+Invalid IPv4 Octet (Out of 0-255 range): 999.12.1.5
+Invalid Digit Strings (All identical digits): 0000 0000 0000 0000
+Invalid Phone Fragment: 12345`;
+
+function msg(text, isErr) {
+  if (!statusMsgEl) return;
+  statusMsgEl.textContent = text;
+  statusMsgEl.style.color = isErr ? "var(--status-err)" : "var(--text-muted)";
+}
+
+function updateCharCount(text) {
+  if (!charCountEl) return;
+  const chars = text.length;
+  const lines = text ? text.split("\n").length : 0;
+  charCountEl.textContent = chars + " character" + (chars === 1 ? "" : "s") + " \u2022 " + lines + " line" + (lines === 1 ? "" : "s");
+}
+
+function renderAuditTable() {
+  const text = inEl.value;
+  const starts = lineStarts(text);
+  const frag = document.createDocumentFragment();
+
+  const filtered = [];
+  for (let i = 0; i < cachedFindings.length; i++) {
+    const f = cachedFindings[i];
+    if (activeAuditFilter === "ALL" || f.type === activeAuditFilter) {
+      filtered.push({ finding: f, rep: cachedReps[i], originalIndex: i + 1 });
+    }
+  }
+
+  const displayLimit = Math.min(filtered.length, 500);
+
+  if (filtered.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="5" style="text-align: center; color: var(--text-sub); padding: 32px;">No findings matching the selected filter.</td>';
+    frag.appendChild(tr);
+    if (auditNoteEl) auditNoteEl.textContent = "Zero findings.";
+  } else {
+    for (let i = 0; i < displayLimit; i++) {
+      const item = filtered[i];
+      const f = item.finding;
+      const lineNum = lineOf(starts, f.start);
+      const tr = document.createElement("tr");
+
+      const tdNum = document.createElement("td");
+      tdNum.textContent = String(item.originalIndex);
+
+      const tdType = document.createElement("td");
+      const spanBadge = document.createElement("span");
+      spanBadge.className = "badge badge-" + f.type;
+      spanBadge.textContent = f.type;
+      tdType.appendChild(spanBadge);
+
+      const tdLine = document.createElement("td");
+      tdLine.textContent = String(lineNum);
+
+      const tdVal = document.createElement("td");
+      tdVal.textContent = f.value;
+
+      const tdRep = document.createElement("td");
+      tdRep.textContent = item.rep;
+
+      tr.appendChild(tdNum);
+      tr.appendChild(tdType);
+      tr.appendChild(tdLine);
+      tr.appendChild(tdVal);
+      tr.appendChild(tdRep);
+      frag.appendChild(tr);
+    }
+    if (auditNoteEl) {
+      auditNoteEl.textContent = "Showing " + displayLimit + " of " + filtered.length + " findings." + (filtered.length > 500 ? " (500 row display cap active)" : "");
+    }
+  }
+
+  auditBodyEl.innerHTML = "";
+  auditBodyEl.appendChild(frag);
+}
+
+function renderInsights() {
+  const kpiTotal = document.getElementById("kpiTotal");
+  const kpiUnique = document.getElementById("kpiUnique");
+  const kpiFinancial = document.getElementById("kpiFinancial");
+  const kpiNetwork = document.getElementById("kpiNetwork");
+
+  const categoryCounts = {};
+  const uniqueKeys = new Set();
+  let financialCount = 0;
+  let networkCount = 0;
+
+  for (let i = 0; i < cachedFindings.length; i++) {
+    const f = cachedFindings[i];
+    categoryCounts[f.type] = (categoryCounts[f.type] || 0) + 1;
+    uniqueKeys.add(f.type + "|" + norm(f));
+    if (f.type === "CARD" || f.type === "PAN") financialCount++;
+    if (f.type === "IP") networkCount++;
+  }
+
+  if (kpiTotal) kpiTotal.textContent = String(cachedFindings.length);
+  if (kpiUnique) kpiUnique.textContent = String(uniqueKeys.size);
+  if (kpiFinancial) kpiFinancial.textContent = String(financialCount);
+  if (kpiNetwork) kpiNetwork.textContent = String(networkCount);
+
+  const metersList = document.getElementById("metersList");
+  if (metersList) {
+    const known = ["EMAIL", "CARD", "AADHAAR", "PAN", "IP", "PHONE"];
+    let html = "";
+    for (let i = 0; i < known.length; i++) {
+      const t = known[i];
+      const count = categoryCounts[t] || 0;
+      const pct = cachedFindings.length > 0 ? Math.round((count / cachedFindings.length) * 100) : 0;
+      html += '<div class="meter-row">' +
+                '<div class="meter-header">' +
+                  '<span>' + t + '</span>' +
+                  '<span>' + count + ' (' + pct + '%)</span>' +
+                '</div>' +
+                '<div class="meter-track">' +
+                  '<div class="meter-bar" style="width: ' + pct + '%; background: var(--' + t + ');"></div>' +
+                '</div>' +
+              '</div>';
+    }
+    metersList.innerHTML = html;
+  }
+}
+
+function run() {
+  const text = inEl.value;
+  updateCharCount(text);
+
+  if (!text) {
+    leftEl.innerHTML = "";
+    rightEl.innerHTML = "";
+    current = "";
+    cachedFindings = [];
+    cachedReps = [];
+    dlBtn.disabled = true;
+    dlCsvBtn.disabled = true;
+    copyBtn.disabled = true;
+    leftCountEl.textContent = "0 detections";
+    rightModeEl.textContent = "Mode: " + mode.toUpperCase();
+    chipsEl.innerHTML = '<span class="chip chip-total">Total Findings: <span class="chip-count">0</span></span><span class="chip">Unique Values: <span class="chip-count">0</span></span>';
+    auditBodyEl.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 32px;">No findings to display. Enter text or load a sample.</td></tr>';
+    auditNoteEl.textContent = "Showing all findings.";
+    renderInsights();
+    msg("Ready. Paste text or click 'Load Noisy Sample'.", false);
+    return;
+  }
+
+  cachedFindings = detect(text);
+  const res = sanitize(text, cachedFindings, mode);
+  cachedReps = res.reps;
+  current = res.text;
+
+  leftEl.innerHTML = view(text, cachedFindings, res.reps, false);
+  rightEl.innerHTML = view(text, cachedFindings, res.reps, true);
+
+  dlBtn.disabled = false;
+  if (isCsvFile) dlCsvBtn.disabled = false;
+  copyBtn.disabled = false;
+
+  leftCountEl.textContent = cachedFindings.length + " detection" + (cachedFindings.length === 1 ? "" : "s");
+  rightModeEl.textContent = "Mode: " + mode.toUpperCase();
+
+  const categoryCounts = {};
+  const uniqueKeys = new Set();
+  for (let i = 0; i < cachedFindings.length; i++) {
+    const f = cachedFindings[i];
+    categoryCounts[f.type] = (categoryCounts[f.type] || 0) + 1;
+    uniqueKeys.add(f.type + "|" + norm(f));
+  }
+
+  let chipsHtml = '<span class="chip chip-total">Total Findings: <span class="chip-count">' + cachedFindings.length + '</span></span>' +
+                  '<span class="chip">Unique Values: <span class="chip-count">' + uniqueKeys.size + '</span></span>';
+  
+  const knownTypes = ["EMAIL", "CARD", "AADHAAR", "PAN", "IP", "PHONE"];
+  for (let i = 0; i < knownTypes.length; i++) {
+    const t = knownTypes[i];
+    if (categoryCounts[t]) {
+      chipsHtml += '<span class="chip"><span class="badge badge-' + t + '">' + t + '</span> <span class="chip-count">' + categoryCounts[t] + '</span></span>';
+    }
+  }
+  chipsEl.innerHTML = chipsHtml;
+
+  renderAuditTable();
+  renderInsights();
+
+  if (cachedFindings.length === 0) {
+    msg("Scan complete: No supported PII patterns detected.", false);
+  } else {
+    msg("Sanitized " + cachedFindings.length + " finding" + (cachedFindings.length === 1 ? "" : "s") + " using " + mode.toUpperCase() + " mode.", false);
+  }
+}
+
+function schedule() {
+  clearTimeout(timer);
+  timer = setTimeout(run, 120);
+}
+
+inEl.addEventListener("input", schedule);
+
+// Synchronized Scrolling between InEl and Right Diff Pane
+let isSyncing = false;
+inEl.addEventListener("scroll", function() {
+  if (isSyncing) return;
+  isSyncing = true;
+  const pct = inEl.scrollTop / (inEl.scrollHeight - inEl.clientHeight || 1);
+  rightEl.scrollTop = pct * (rightEl.scrollHeight - rightEl.clientHeight || 1);
+  isSyncing = false;
+});
+
+rightEl.addEventListener("scroll", function() {
+  if (isSyncing) return;
+  isSyncing = true;
+  const pct = rightEl.scrollTop / (rightEl.scrollHeight - rightEl.clientHeight || 1);
+  inEl.scrollTop = pct * (inEl.scrollHeight - inEl.clientHeight || 1);
+  isSyncing = false;
+});
+
+// Redaction Mode Selector Radios
+const modeRadios = document.querySelectorAll('input[name="mode"]');
+modeRadios.forEach(function(radio) {
+  radio.parentElement.addEventListener("click", function() {
+    document.querySelectorAll(".mode-opt").forEach(function(opt) { opt.classList.remove("active"); });
+    radio.parentElement.classList.add("active");
+    radio.checked = true;
+    mode = radio.value;
+    run();
+  });
+});
+
+// Navigation View Routing
+const navButtons = document.querySelectorAll(".nav-link");
+const viewSections = document.querySelectorAll(".view-section");
+
+function switchView(targetId) {
+  viewSections.forEach(function(sec) { sec.classList.remove("active"); });
+  navButtons.forEach(function(btn) { btn.classList.remove("active"); });
+
+  const targetSec = document.getElementById(targetId);
+  if (targetSec) targetSec.classList.add("active");
+
+  const matchingBtn = document.querySelector('.nav-link[data-view="' + targetId + '"]');
+  if (matchingBtn) matchingBtn.classList.add("active");
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+navButtons.forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    const target = btn.getAttribute("data-view");
+    switchView(target);
+  });
+});
+
+const heroOpenWorkspaceBtn = document.getElementById("heroOpenWorkspaceBtn");
+if (heroOpenWorkspaceBtn) {
+  heroOpenWorkspaceBtn.addEventListener("click", function() {
+    switchView("viewWorkspace");
+  });
+}
+
+const heroExploreBtn = document.getElementById("heroExploreBtn");
+if (heroExploreBtn) {
+  heroExploreBtn.addEventListener("click", function() {
+    const el = document.getElementById("howItWorksSection");
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  });
+}
+
+const brandHomeBtn = document.getElementById("brandHomeBtn");
+if (brandHomeBtn) {
+  brandHomeBtn.addEventListener("click", function() {
+    switchView("viewLanding");
+  });
+}
+
+// Audit Filter Buttons
+document.querySelectorAll("#auditFilters button").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    document.querySelectorAll("#auditFilters button").forEach(function(b) { b.classList.remove("btn-primary"); });
+    btn.classList.add("btn-primary");
+    activeAuditFilter = btn.getAttribute("data-filter");
+    renderAuditTable();
+  });
+});
+
+// Sample Loader Action
+sampleBtn.addEventListener("click", function() {
+  originalFileName = "noisy-sample.txt";
+  isCsvFile = false;
+  dlCsvBtn.style.display = "none";
+  inEl.value = SAMPLE_TEXT;
+  run();
+  switchView("viewWorkspace");
+  msg("Loaded noisy sample (16 findings, 0 decoys).", false);
+});
+
+// Clear Workspace Action
+clearBtn.addEventListener("click", function() {
+  inEl.value = "";
+  originalFileName = "";
+  isCsvFile = false;
+  dlCsvBtn.style.display = "none";
+  run();
+  msg("Workspace cleared.", false);
+});
+
+// File Import Handlers
+fileTxtBtn.addEventListener("click", function() {
+  fileInput.accept = ".txt";
+  fileInput.click();
+});
+
+fileCsvBtn.addEventListener("click", function() {
+  fileInput.accept = ".csv";
+  fileInput.click();
+});
+
+fileInput.addEventListener("change", function(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    msg("File is larger than 5 MB. Please select a smaller file.", true);
+    fileInput.value = "";
+    return;
+  }
+
+  const name = file.name.toLowerCase();
+  if (!name.endsWith(".txt") && !name.endsWith(".csv")) {
+    msg("Only .txt and .csv files are supported.", true);
+    fileInput.value = "";
+    return;
+  }
+
+  originalFileName = file.name;
+  isCsvFile = name.endsWith(".csv");
+  if (isCsvFile) {
+    dlCsvBtn.style.display = "inline-flex";
+  } else {
+    dlCsvBtn.style.display = "none";
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    inEl.value = evt.target.result;
+    run();
+    switchView("viewWorkspace");
+    msg("Imported " + file.name + " (" + Math.round(file.size / 1024) + " KB).", false);
+  };
+  reader.onerror = function() {
+    msg("Could not read that file.", true);
+  };
+  reader.readAsText(file);
+  fileInput.value = "";
+});
+
+// Download Handlers
+function triggerDownload(content, defaultExt) {
+  if (!content) return;
+  let outName = "sanitized-document." + defaultExt;
+  if (originalFileName) {
+    const dot = originalFileName.lastIndexOf(".");
+    const base = dot !== -1 ? originalFileName.slice(0, dot) : originalFileName;
+    outName = base + ".sanitized." + defaultExt;
+  }
+
+  const blob = new Blob([content], { type: defaultExt === "csv" ? "text/csv;charset=utf-8" : "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = outName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+  msg("Downloaded " + outName, false);
+}
+
+dlBtn.addEventListener("click", function() {
+  triggerDownload(current, "txt");
+});
+
+dlCsvBtn.addEventListener("click", function() {
+  triggerDownload(current, "csv");
+});
+
+// Copy to Clipboard Action
+copyBtn.addEventListener("click", function() {
+  if (!current) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(current).then(function() {
+      msg("Sanitized text copied to clipboard.", false);
+    }).catch(function() {
+      msg("Copy blocked by browser; use Download instead.", true);
+    });
+  } else {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = current;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      msg("Sanitized text copied to clipboard.", false);
+    } catch (e) {
+      msg("Copy blocked by browser; use Download instead.", true);
+    }
+  }
+});
+
+// Theme Toggle
+themeToggleBtn.addEventListener("click", function() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute("data-theme") === "dark";
+  const nextTheme = isDark ? "light" : "dark";
+  html.setAttribute("data-theme", nextTheme);
+  
+  const darkIcon = document.querySelector(".theme-icon-dark");
+  const lightIcon = document.querySelector(".theme-icon-light");
+  if (isDark) {
+    darkIcon.style.display = "none";
+    lightIcon.style.display = "block";
+  } else {
+    darkIcon.style.display = "block";
+    lightIcon.style.display = "none";
+  }
+});
+
+// Instant Session Memory Wipe
+if (wipeMemoryBtn) {
+  wipeMemoryBtn.addEventListener("click", function() {
+    inEl.value = "";
+    current = "";
+    cachedFindings = [];
+    cachedReps = [];
+    originalFileName = "";
+    isCsvFile = false;
+    run();
+    switchView("viewWorkspace");
+    msg("Session memory purged: all in-memory text and tokens wiped.", false);
+  });
+}
+
+// Extension Download & Modal Controller
+function triggerExtensionDownload() {
+  const a = document.createElement("a");
+  a.href = "blackout-guard-extension.zip";
+  a.download = "blackout-guard-extension.zip";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  const modal = document.getElementById("extModal");
+  if (modal) modal.style.display = "flex";
+  msg("Downloaded blackout-guard-extension.zip. Follow setup instructions to load into Chrome/Edge.", false);
+}
+
+["downloadExtNavBtn", "heroDownloadExtBtn", "showcaseDownloadExtBtn", "settingsDownloadExtBtn"].forEach(function(id) {
+  const btn = document.getElementById(id);
+  if (btn) btn.addEventListener("click", triggerExtensionDownload);
+});
+
+const closeExtModalBtn = document.getElementById("closeExtModalBtn");
+const doneExtModalBtn = document.getElementById("doneExtModalBtn");
+const extModal = document.getElementById("extModal");
+
+if (closeExtModalBtn && extModal) {
+  closeExtModalBtn.addEventListener("click", function() {
+    extModal.style.display = "none";
+  });
+}
+if (doneExtModalBtn && extModal) {
+  doneExtModalBtn.addEventListener("click", function() {
+    extModal.style.display = "none";
+  });
+}
+if (extModal) {
+  extModal.addEventListener("click", function(e) {
+    if (e.target === extModal) extModal.style.display = "none";
+  });
+}
+  </script>
+</body>
+</html>
